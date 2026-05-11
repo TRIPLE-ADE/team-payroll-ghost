@@ -1,4 +1,4 @@
-# GhostBuster Backend — Testing Guide
+# GhostGuard Backend — Testing Guide
 
 This guide walks through testing every part of the backend, from startup to a complete end-to-end payroll run.
 
@@ -17,13 +17,13 @@ cp backend/.env.example backend/.env
 Fill in at minimum:
 
 ```env
-DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/ghostbuster
+DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/ghostguard
 ML_SERVICE_URL=http://localhost:5000
 SQUAD_API_KEY=your_sandbox_key
 SQUAD_SECRET_KEY=your_sandbox_secret
-SQUAD_MERCHANT_ID=GHOSTBUSTER
+SQUAD_MERCHANT_ID=GHOSTGUARD
 JWT_SECRET=any-long-random-string-32-chars-min
-ADMIN_EMAIL=admin@ghostbuster.io
+ADMIN_EMAIL=admin@ghostguard.io
 ADMIN_PASSWORD=changeme123
 ```
 
@@ -32,8 +32,8 @@ ADMIN_PASSWORD=changeme123
 ```bash
 # Using Docker:
 docker run -d \
-  --name ghostbuster-db \
-  -e POSTGRES_DB=ghostbuster \
+  --name ghostguard-db \
+  -e POSTGRES_DB=ghostguard \
   -e POSTGRES_PASSWORD=password \
   -p 5432:5432 \
   postgres:15
@@ -68,7 +68,7 @@ curl http://localhost:8000/health
 
 Expected:
 ```json
-{"status": "ok", "service": "ghostbuster-backend"}
+{"status": "ok", "service": "ghostguard-backend"}
 ```
 
 ---
@@ -80,7 +80,7 @@ Expected:
 ```bash
 curl -s -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "admin@ghostbuster.io", "password": "changeme123"}' | jq
+  -d '{"email": "admin@ghostguard.io", "password": "changeme123"}' | jq
 ```
 
 Expected:
@@ -96,7 +96,7 @@ Save the token for all subsequent requests:
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "admin@ghostbuster.io", "password": "changeme123"}' | jq -r '.access_token')
+  -d '{"email": "admin@ghostguard.io", "password": "changeme123"}' | jq -r '.access_token')
 
 echo $TOKEN
 ```
@@ -459,7 +459,7 @@ This simulates Squad calling your webhook after a transfer.
 ```bash
 SQUAD_SECRET="your_squad_secret_key_here"
 
-BODY='{"transaction_reference":"GHOSTBUSTER_EMP001_a1b2c3d4","transaction_status":"success"}'
+BODY='{"transaction_reference":"GHOSTGUARD_EMP001_a1b2c3d4","transaction_status":"success"}'
 
 # Compute HMAC-SHA512 signature
 SIG=$(echo -n "$BODY" | openssl dgst -sha512 -hmac "$SQUAD_SECRET" | awk '{print $2}')
@@ -474,7 +474,7 @@ Expected:
 ```json
 {
   "response_code": 200,
-  "transaction_reference": "GHOSTBUSTER_EMP001_a1b2c3d4",
+  "transaction_reference": "GHOSTGUARD_EMP001_a1b2c3d4",
   "response_description": "Success"
 }
 ```
@@ -519,7 +519,7 @@ uvicorn app.main:app --reload --port 8000
 # 2. Login
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@ghostbuster.io","password":"changeme123"}' | jq -r '.access_token')
+  -d '{"email":"admin@ghostguard.io","password":"changeme123"}' | jq -r '.access_token')
 
 # 3. Upload payroll
 CYCLE_ID=$(curl -s -X POST http://localhost:8000/api/v1/payroll/cycles \

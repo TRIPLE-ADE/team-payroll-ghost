@@ -1,4 +1,4 @@
-# GhostBuster API — Frontend Integration Docs
+# GhostGuard API — Frontend Integration Docs
 
 **Base URL:** `https://<backend-cloud-run-url>`  
 **Local dev:** `http://localhost:8000`  
@@ -20,7 +20,7 @@ Content-Type: application/json
 **Request body:**
 ```json
 {
-  "email": "admin@ghostbuster.io",
+  "email": "admin@ghostguard.io",
   "password": "changeme123"
 }
 ```
@@ -448,7 +448,7 @@ All payment intervention records with history.
     "state": "released",
     "netAmount": 450000.0,
     "updatedAt": "2026-05-11T11:00:00+00:00",
-    "squadRef": "GHOSTBUSTER_EMP001234_a1b2c3d4",
+    "squadRef": "GHOSTGUARD_EMP001234_a1b2c3d4",
     "history": [
       {
         "at": "2026-05-11T10:35:00+00:00",
@@ -615,7 +615,7 @@ x-squad-signature: <hmac-sha512 of request body>
 **Request body (Squad sends this):**
 ```json
 {
-  "transaction_reference": "GHOSTBUSTER_EMP001234_a1b2c3d4",
+  "transaction_reference": "GHOSTGUARD_EMP001234_a1b2c3d4",
   "transaction_status": "success"
 }
 ```
@@ -624,7 +624,7 @@ x-squad-signature: <hmac-sha512 of request body>
 ```json
 {
   "response_code": 200,
-  "transaction_reference": "GHOSTBUSTER_EMP001234_a1b2c3d4",
+  "transaction_reference": "GHOSTGUARD_EMP001234_a1b2c3d4",
   "response_description": "Success"
 }
 ```
@@ -638,7 +638,7 @@ x-squad-signature: <hmac-sha512 of request body>
 ### GET `/health`
 
 ```json
-{ "status": "ok", "service": "ghostbuster-backend" }
+{ "status": "ok", "service": "ghostguard-backend" }
 ```
 
 ### GET `/`

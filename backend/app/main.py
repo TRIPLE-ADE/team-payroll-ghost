@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="GhostBuster API",
+    title="GhostGuard API",
     description="AI-Powered Payroll Fraud Detection — Squad Hackathon 3.0",
     version="1.0.0",
     lifespan=lifespan,
@@ -45,13 +45,13 @@ app.include_router(webhooks.router)
 
 @app.get("/health", tags=["system"])
 async def health():
-    return {"status": "ok", "service": "ghostbuster-backend"}
+    return {"status": "ok", "service": "ghostguard-backend"}
 
 
 @app.get("/", tags=["system"])
 async def root():
     return {
-        "service": "GhostBuster API",
+        "service": "GhostGuard API",
         "version": "1.0.0",
         "docs": "/docs",
     }

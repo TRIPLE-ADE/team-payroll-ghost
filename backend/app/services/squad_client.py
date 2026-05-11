@@ -34,7 +34,7 @@ class SquadClient:
             "first_name": first_name,
             "last_name": last_name,
             "mobile_num": "",
-            "email": f"{emp_id}@ghostbuster.io",
+            "email": f"{emp_id}@ghostguard.io",
             "bvn": bvn,
             "dob": dob,
             "gender": gender,
