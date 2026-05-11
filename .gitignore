@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+ml/venv/
+ml/__pycache__/
+
+# Build outputs
+frontend/.next/
+frontend/out/
+ml/models/
+ml/data/
+
+# Environment files
+.env
+.env.local
+.env*.local
+frontend/.env
+frontend/.env.local
+ml/.env
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+BACKEND_EXPLANATION.md
