@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 GhostGuard Flask API — app.py
 Full REST API for ghost worker detection + vendor trust scoring
@@ -12,6 +13,7 @@ from flask import Flask, request, jsonify, g
 from flasgger import Swagger
 
 BASE      = Path(__file__).parent
+print(f"[GhostGuard] Base directory: {BASE}")
 MODEL_DIR = BASE / "models"
 DATA_DIR  = BASE / "data"
 SALT      = os.environ.get("ANON_SALT", "ghostguard-hackathon-2025-salt")
@@ -285,6 +287,7 @@ def analyze_employee():
         description: Missing required fields
     """
     data = request.get_json(silent=True)
+    print(f"[GhostGuard] Received employee analysis request: {data}")
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
     missing = [f for f in ["emp_id","salary","grade_level","tenure_months"] if f not in data]
