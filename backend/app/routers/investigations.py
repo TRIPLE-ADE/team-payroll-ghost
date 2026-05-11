@@ -211,13 +211,13 @@ async def submit_action(
 
     # ── approve_payment ──────────────────────────────────────────────────────
     elif action == "approve_payment":
-        # BVN validation guard
-        bvn_check = {"status": "BVN_VALID"}
+        # Step 1: Create/validate virtual account with BVN
+        verified_account_name = None
         if emp.bvn:
             name_parts = emp.name.split()
             first = name_parts[0] if name_parts else emp.name
             last = name_parts[-1] if len(name_parts) > 1 else emp.name
-            bvn_check = await squad_client.validate_bvn(
+            va_response = await squad_client.create_virtual_account(
                 emp_id=emp.emp_id,
                 first_name=first,
                 last_name=last,
@@ -226,26 +226,49 @@ async def submit_action(
                 gender=emp.gender or "M",
             )
 
-        if bvn_check["status"] == "BVN_MISMATCH":
-            await _audit(
-                db, "verification",
-                "BVN validation failed — payment blocked",
-                bvn_check.get("reason", "BVN mismatch"),
-                investigation_id,
-            )
-            await db.commit()
-            return ActionResponse(ok=False, message=f"BVN mismatch: {bvn_check.get('reason')}")
+            if va_response["status"] == "BVN_MISMATCH":
+                await _audit(
+                    db, "verification",
+                    "BVN validation failed — payment blocked",
+                    va_response.get("reason", "BVN validation failed"),
+                    investigation_id,
+                )
+                await db.commit()
+                return ActionResponse(ok=False, message=f"BVN mismatch: {va_response.get('reason')}")
 
-        # Fire Squad transfer
+            verified_account_name = va_response.get("account_name")
+
+        # Step 2: Lookup account to confirm routing (optional but recommended)
+        if emp.account_number and emp.bank_code:
+            try:
+                lookup_resp = await squad_client.lookup_account(
+                    account_number=emp.account_number,
+                    bank_code=emp.bank_code,
+                )
+                if lookup_resp.get("status") != "success":
+                    await _audit(
+                        db, "intervention",
+                        "Account lookup failed",
+                        f"Account {emp.account_number} invalid or inactive",
+                        investigation_id,
+                    )
+                    await db.commit()
+                    return ActionResponse(ok=False, message="Account validation failed")
+            except Exception as lookup_err:
+                # Log but don't block — continue with verified_account_name
+                await _audit(db, "intervention", "Account lookup error", str(lookup_err), investigation_id)
+
+        # Step 3: Fire Squad transfer with verified account name
         squad_ref = None
         squad_status = None
-        if emp.account_number and emp.bank_code:
+        if emp.account_number and emp.bank_code and verified_account_name:
             tx_ref = squad_client.build_tx_ref(emp.emp_id)
             amount_kobo = int(float(emp.salary or 0) * 100)
             try:
                 transfer_resp = await squad_client.transfer(
                     account_number=emp.account_number,
                     bank_code=emp.bank_code,
+                    account_name=verified_account_name,  # REQUIRED by Squad
                     amount_kobo=amount_kobo,
                     tx_ref=tx_ref,
                     narration=f"Salary payment — {emp.emp_id}",
@@ -254,6 +277,7 @@ async def submit_action(
                 squad_status = "pending"
             except Exception as e:
                 squad_status = "failed"
+                await _audit(db, "intervention", "Transfer initiation failed", str(e), investigation_id)
 
         if flagged_row:
             flagged_row.payment_status = "approved"

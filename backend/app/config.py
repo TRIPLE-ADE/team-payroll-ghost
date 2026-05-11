@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     ML_SERVICE_URL: str = "http://localhost:5000"
     SQUAD_API_KEY: str = ""
     SQUAD_SECRET_KEY: str = ""
+    SQUAD_MERCHANT_ID: str = "GHOSTBUSTER"  # Required in transaction_reference per Squad spec
     SQUAD_BASE_URL: str = "https://sandbox-api-d.squadco.com"
     JWT_SECRET: str = "dev-secret-change-in-prod"
     JWT_EXPIRE_MINUTES: int = 60

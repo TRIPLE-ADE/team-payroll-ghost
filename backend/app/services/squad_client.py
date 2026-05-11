@@ -1,4 +1,4 @@
-import time
+import uuid
 
 import httpx
 
@@ -8,12 +8,13 @@ from app.config import settings
 class SquadClient:
     def __init__(self):
         self.base = settings.SQUAD_BASE_URL.rstrip("/")
+        self.merchant_id = settings.SQUAD_MERCHANT_ID
         self.headers = {
             "Authorization": f"Bearer {settings.SQUAD_API_KEY}",
             "Content-Type": "application/json",
         }
 
-    async def validate_bvn(
+    async def create_virtual_account(
         self,
         emp_id: str,
         first_name: str,
@@ -23,8 +24,10 @@ class SquadClient:
         gender: str,
     ) -> dict:
         """
-        POST /virtual-account — Squad 400 = BVN mismatch = identity unverified.
-        Returns { "status": "BVN_VALID" } or { "status": "BVN_MISMATCH", "reason": "..." }.
+        POST /virtual-account
+        Creates virtual account and validates BVN internally.
+        Returns { "status": "BVN_VALID", "account_name": "...", ... }
+        or { "status": "BVN_MISMATCH", "reason": "..." } on 400.
         """
         payload = {
             "customer_identifier": f"GBUSTER_{emp_id}",
@@ -49,7 +52,10 @@ class SquadClient:
                     data = resp.json()
                     return {"status": "BVN_MISMATCH", "reason": data.get("message", "BVN validation failed")}
                 resp.raise_for_status()
-                return {"status": "BVN_VALID", "data": resp.json()}
+                data = resp.json()
+                # Extract account_name from Squad response (varies by API version)
+                account_name = data.get("account_name") or f"{first_name} {last_name}"
+                return {"status": "BVN_VALID", "account_name": account_name, "data": data}
         except httpx.HTTPStatusError as e:
             return {"status": "BVN_MISMATCH", "reason": str(e)}
 
@@ -68,20 +74,27 @@ class SquadClient:
         self,
         account_number: str,
         bank_code: str,
+        account_name: str,
         amount_kobo: int,
         tx_ref: str,
         narration: str,
     ) -> dict:
-        """POST /payout/transfer — amount in kobo (naira × 100)."""
+        """
+        POST /payout/transfer
+        amount_kobo: salary in kobo (naira × 100)
+        account_name: REQUIRED by Squad (verified from virtual account/lookup)
+        tx_ref: MUST include MERCHANT_ID per Squad spec
+        """
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 f"{self.base}/payout/transfer",
                 json={
                     "account_number": account_number,
                     "bank_code": bank_code,
+                    "account_name": account_name,  # REQUIRED
                     "currency_id": "NGN",
                     "amount": amount_kobo,
-                    "transaction_reference": tx_ref,
+                    "transaction_reference": tx_ref,  # Must include merchant ID
                     "narration": narration,
                 },
                 headers=self.headers,
@@ -111,7 +124,12 @@ class SquadClient:
             return resp.json()
 
     def build_tx_ref(self, emp_id: str) -> str:
-        return f"GBUSTER_{emp_id}_{int(time.time())}"
+        """
+        Generate unique transaction reference with merchant ID.
+        Format: {MERCHANT_ID}_{emp_id}_{random_suffix}
+        IMPORTANT: Squad requires merchant ID in the reference.
+        """
+        return f"{self.merchant_id}_{emp_id}_{uuid.uuid4().hex[:8]}"
 
 
 squad_client = SquadClient()
