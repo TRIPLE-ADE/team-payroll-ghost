@@ -95,10 +95,11 @@ async def run_analysis(cycle_id: str, db: AsyncSession) -> None:
         await db.commit()
         return
 
-    # 2. Build in-memory CSV for ML service
+    # 2. Build in-memory CSV for ML service — full schema for analyze, minimal for duplicates
     rows = []
+    dup_rows = []
     for emp in employees:
-        rows.append({
+        row = {
             "emp_id": emp.emp_id,
             "salary": float(emp.salary or 0),
             "grade_level": emp.grade_level or "GL-07",
@@ -110,15 +111,26 @@ async def run_analysis(cycle_id: str, db: AsyncSession) -> None:
             "months_no_deduction": emp.months_no_deduction or 0,
             "leave_days_taken": emp.leave_days_taken or 0,
             "promotion_count": emp.promotion_count or 0,
+        }
+        rows.append(row)
+        # Duplicates detection only needs 4 fields
+        dup_rows.append({
+            "emp_id": emp.emp_id,
+            "bvn": emp.bvn or "",
+            "nin": emp.nin or "",
+            "account_number": emp.account_number or "",
         })
 
     df = pd.DataFrame(rows)
     csv_bytes = df.to_csv(index=False).encode()
 
+    dup_df = pd.DataFrame(dup_rows)
+    dup_csv_bytes = dup_df.to_csv(index=False).encode()
+
     # 3. Call ML service
     try:
         batch_result = await ml_client.analyze_batch(csv_bytes)
-        dup_result = await ml_client.detect_duplicates(csv_bytes)
+        dup_result = await ml_client.detect_duplicates(dup_csv_bytes)
     except Exception as e:
         await _mark_cycle(db, cycle_uuid, "ready", 0, 0, 100)
         await _append_audit(db, "anomaly", "Analysis error", str(e), "engine.anomaly", cycle_id)
