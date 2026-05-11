@@ -81,7 +81,7 @@ export function AuditTimeline() {
             transition={{ delay: idx * 0.04 }}
             className="relative pb-10 pl-2 last:pb-0"
           >
-            <span className="absolute -left-[29px] top-1.5 flex h-3 w-3 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950">
+            <span className="absolute left-[-29px] top-1.5 flex h-3 w-3 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950">
               <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
             </span>
             <div
