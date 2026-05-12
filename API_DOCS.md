@@ -123,6 +123,95 @@ Per-department risk breakdown for the risk heatmap.
 
 ---
 
+### GET `/api/v1/treasury/wallet`
+
+Squad-linked **payroll float**: balance and **virtual account** used to fund disbursements — powers the **Payroll float** card.
+
+**Response `200`:**
+```json
+{
+  "balanceAmount": 48250000,
+  "availableAmount": 47800000,
+  "pendingSettlementAmount": 450000,
+  "virtualAccountNumber": "9988776655123",
+  "bankName": "Access Bank (Squad virtual)",
+  "accountName": "Northfield Consortium · Payroll Float",
+  "lastSyncedAt": "2026-05-11T12:00:00+00:00",
+  "squadMerchantRef": "sqd_mrch_..."
+}
+```
+
+All amount fields are **NGN** (whole naira). `bankName` / `virtualAccountNumber` values come from Squad (or sandbox).
+
+---
+
+### GET `/api/v1/operations/liquidity`
+
+**Integrity holds vs scheduled run** — links risk actions to treasury (powers **Liquidity vs holds**).
+
+**Response `200`:**
+```json
+{
+  "pausedPaymentsTotalAmount": 39400,
+  "scheduledPayrollTotalAmount": 4289000,
+  "heldCount": 2,
+  "asOf": "2026-05-11T12:00:05+00:00"
+}
+```
+
+- `pausedPaymentsTotalAmount`: sum of **paused** disbursement nets in active cycles / intervention queue  
+- `scheduledPayrollTotalAmount`: total disbursement target for the **current operational payroll run** (`ready`/`analyzing`), or `0` if none  
+
+---
+
+### GET `/api/v1/operations/queue-stats`
+
+**Review queue / SLA-ish** indicators for the dashboard **Review queue** card.
+
+**Response `200`:**
+```json
+{
+  "openFlagsCount": 14,
+  "openInvestigationsCount": 6,
+  "oldestOpenInvestigationAgeHours": 72.5,
+  "pausedAmountOnHold": 39400
+}
+```
+
+`oldestOpenInvestigationAgeHours` should reflect the **longest-running** unresolved investigation (hours since `openedAt`).
+
+---
+
+### GET `/api/v1/squad/ledger/recent`
+
+Recent **money-movement–style events** tied to Squad (holds, releases, credits). Powers **Squad payout activity** alongside audit events.
+
+**Query params:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `limit` | int (optional, default `10`) | Max entries; cap at ~20 |
+
+**Response `200`:**
+```json
+[
+  {
+    "id": "sl-7721",
+    "at": "2026-05-09T10:00:00+00:00",
+    "title": "Virtual account credit",
+    "detail": "GTBank transfer — treasury top-up",
+    "amount": 5000000,
+    "direction": "credit",
+    "squadRef": "SQUAD-VA-IN-7721",
+    "relatedCycleId": null,
+    "relatedEmployeeId": null
+  }
+]
+```
+
+`direction`: `"credit"` | `"debit"` | `"hold"` | `"release"`
+
+---
+
 ## Payroll Cycles
 
 ### GET `/api/v1/payroll/cycles`
@@ -153,6 +242,14 @@ List all payroll cycles, newest first.
 ```
 
 `processingStatus` lifecycle: `uploaded` → `analyzing` → `ready` → `locked`
+
+---
+
+### GET `/api/v1/payroll/cycles/current`
+
+**Current operational payroll run** for the command center (**Current payroll run** banner). Convenience over listing cycles: typically the newest cycle whose `processingStatus` is `ready` or `analyzing`.
+
+**Response `200`:** A single cycle summary object (same JSON shape as one element from `GET /api/v1/payroll/cycles`), or **`null`** if no cycle qualifies.
 
 ---
 
@@ -567,6 +664,8 @@ Last 100 audit events, newest first.
 ---
 
 ## Settings
+
+**Dashboard:** `institutionName` and `anomalySensitivity` surface on the operational dashboard **policy** strip (persisted client-side until backed by GET/PUT).
 
 ### GET `/api/v1/settings`
 
