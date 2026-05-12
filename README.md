@@ -154,7 +154,7 @@ Historical Data Correlation
         ↓
 Risk Intelligence Engine
         ↓
-Anomaly Detection
+Anomaly Detection and Duplicate Worker Detection
         ↓
 Trust Score Updates
         ↓
@@ -248,6 +248,18 @@ The UI focuses heavily on:
 ## Backend
 - FastAPI
 - PostgreSQL
+
+## ML
+| Component          | Technology         |
+| ------------------ | ------------------ |
+| Backend API        | Flask              |
+| ML Framework       | XGBoost            |
+| Anomaly Detection  | Isolation Forest   |
+| Clustering         | DBSCAN             |
+| Data Processing    | Pandas + NumPy     |
+| Duplicate Matching | RapidFuzz + Splink |
+| Storage(log)       | SQLite             |
+
 
 ---
 
@@ -365,6 +377,7 @@ The goal is to help institutions:
 # Team
 
 - Abdulrasheed Abdulsalam (Frontend Engineer)
+- Mustapha Oyebamiji (ML Engineer)
 
 ---
 
