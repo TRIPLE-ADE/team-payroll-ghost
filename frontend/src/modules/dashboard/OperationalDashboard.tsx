@@ -15,12 +15,25 @@ import { ClientOnlyChart } from "@/components/ClientOnlyChart";
 import { RiskBadge } from "@/components/RiskBadge";
 import { SectionTitle } from "@/components/SectionTitle";
 import {
+  useCurrentPayrollCycleBrief,
   useDepartmentRisk,
   useIntegrityOverview,
   useIntegrityTrends,
   useInvestigations,
+  useLiquiditySnapshot,
+  useOperationalQueueStats,
+  useRecentSquadLedger,
   useThreatFeed,
+  useTreasuryWallet,
 } from "@/hooks/use-domain-queries";
+import {
+  CurrentCycleSection,
+  LiquiditySection,
+  PolicyModeLine,
+  QueueStatsSection,
+  SquadLedgerSection,
+  TreasuryFundingSection,
+} from "@/modules/dashboard/DashboardOperationalExtensions";
 import { cn, formatShortDate } from "@/lib/utils";
 import type { DepartmentRisk, RiskSeverity } from "@/types/domain";
 
@@ -82,6 +95,11 @@ export function OperationalDashboard() {
   const dept = useDepartmentRisk();
   const trends = useIntegrityTrends();
   const investigations = useInvestigations();
+  const treasury = useTreasuryWallet();
+  const liquidity = useLiquiditySnapshot();
+  const currentCycle = useCurrentPayrollCycleBrief();
+  const queueStats = useOperationalQueueStats();
+  const squadLedger = useRecentSquadLedger(8);
 
   const ov = overview.data;
   const chartData = trends.data ?? [];
@@ -98,6 +116,22 @@ export function OperationalDashboard() {
         eyebrow="Command center"
         title="Risk operations · payroll integrity overview"
       />
+
+      <PolicyModeLine />
+
+      <div className="grid gap-4 lg:grid-cols-12">
+        <div className="lg:col-span-7">
+          <TreasuryFundingSection q={treasury} />
+        </div>
+        <div className="lg:col-span-5">
+          <LiquiditySection q={liquidity} />
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <CurrentCycleSection q={currentCycle} />
+        <QueueStatsSection q={queueStats} />
+      </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Kpi
@@ -122,8 +156,8 @@ export function OperationalDashboard() {
         />
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
+      <div className="grid items-start gap-6 xl:grid-cols-3">
+        <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4 xl:col-span-1">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-zinc-200">Threat feed</h2>
             <span className="font-mono text-[10px] text-zinc-500">Live queue</span>
@@ -198,6 +232,8 @@ export function OperationalDashboard() {
             <p className="text-sm text-zinc-500">No open investigations.</p>
           ) : null}
         </div>
+
+        <SquadLedgerSection q={squadLedger} />
       </div>
 
       <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">

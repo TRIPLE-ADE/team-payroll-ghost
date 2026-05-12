@@ -9,6 +9,11 @@ export const qk = {
   trends: ["trends", "integrity"] as const,
   cycles: ["payroll", "cycles"] as const,
   cycle: (id: string) => ["payroll", "cycle", id] as const,
+  cycleCurrent: ["payroll", "cycles", "current"] as const,
+  treasury: ["treasury", "wallet"] as const,
+  liquidity: ["operations", "liquidity"] as const,
+  squadLedger: ["squad", "ledger"] as const,
+  queueStats: ["operations", "queue-stats"] as const,
   investigations: ["investigations"] as const,
   investigation: (id: string) => ["investigation", id] as const,
   relationships: ["relationships"] as const,
@@ -33,6 +38,41 @@ export function useDepartmentRisk() {
 
 export function useIntegrityTrends() {
   return useQuery({ queryKey: qk.trends, queryFn: () => mockApi.getTrends() });
+}
+
+export function useTreasuryWallet() {
+  return useQuery({
+    queryKey: qk.treasury,
+    queryFn: () => mockApi.getTreasuryWallet(),
+  });
+}
+
+export function useLiquiditySnapshot() {
+  return useQuery({
+    queryKey: qk.liquidity,
+    queryFn: () => mockApi.getLiquiditySnapshot(),
+  });
+}
+
+export function useCurrentPayrollCycleBrief() {
+  return useQuery({
+    queryKey: qk.cycleCurrent,
+    queryFn: () => mockApi.getCurrentPayrollCycleBrief(),
+  });
+}
+
+export function useRecentSquadLedger(limit = 8) {
+  return useQuery({
+    queryKey: [...qk.squadLedger, limit] as const,
+    queryFn: () => mockApi.getRecentSquadLedger(limit),
+  });
+}
+
+export function useOperationalQueueStats() {
+  return useQuery({
+    queryKey: qk.queueStats,
+    queryFn: () => mockApi.getOperationalQueueStats(),
+  });
 }
 
 export function usePayrollCycles() {
@@ -105,6 +145,11 @@ export function useUploadPayrollBatch() {
       mockApi.uploadPayrollBatch(input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.cycles });
+      void qc.invalidateQueries({ queryKey: qk.cycleCurrent });
+      void qc.invalidateQueries({ queryKey: qk.treasury });
+      void qc.invalidateQueries({ queryKey: qk.liquidity });
+      void qc.invalidateQueries({ queryKey: qk.queueStats });
+      void qc.invalidateQueries({ queryKey: qk.squadLedger });
       void qc.invalidateQueries({ queryKey: qk.audit });
       void qc.invalidateQueries({ queryKey: qk.overview });
       void qc.invalidateQueries({ queryKey: qk.payments });
@@ -118,6 +163,11 @@ export function useStartCycleAnalysis() {
     mutationFn: (cycleId: string) => mockApi.startCycleAnalysis(cycleId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.cycles });
+      void qc.invalidateQueries({ queryKey: qk.cycleCurrent });
+      void qc.invalidateQueries({ queryKey: qk.treasury });
+      void qc.invalidateQueries({ queryKey: qk.liquidity });
+      void qc.invalidateQueries({ queryKey: qk.queueStats });
+      void qc.invalidateQueries({ queryKey: qk.squadLedger });
       void qc.invalidateQueries({
         predicate: (q) => q.queryKey[0] === "payroll",
       });
@@ -142,6 +192,11 @@ export function useInvestigationActionMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.overview });
       void qc.invalidateQueries({ queryKey: qk.cycles });
+      void qc.invalidateQueries({ queryKey: qk.cycleCurrent });
+      void qc.invalidateQueries({ queryKey: qk.treasury });
+      void qc.invalidateQueries({ queryKey: qk.liquidity });
+      void qc.invalidateQueries({ queryKey: qk.queueStats });
+      void qc.invalidateQueries({ queryKey: qk.squadLedger });
       void qc.invalidateQueries({ queryKey: qk.investigations });
       void qc.invalidateQueries({ queryKey: qk.audit });
       void qc.invalidateQueries({ queryKey: qk.payments });

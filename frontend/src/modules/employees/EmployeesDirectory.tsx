@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { RiskBadge } from "@/components/RiskBadge";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useEmployeesDirectory } from "@/hooks/use-domain-queries";
-import { cn, formatShortDate } from "@/lib/utils";
+import { cn, formatCurrency, formatShortDate } from "@/lib/utils";
 import type { RiskSeverity } from "@/types/domain";
 
 function verLabel(s: string) {
@@ -142,7 +142,7 @@ export function EmployeesDirectory() {
                   </span>
                 </td>
                 <td className="px-4 py-3 font-mono text-zinc-400">
-                  {e.lastNetPay != null ? `$${e.lastNetPay.toLocaleString()}` : "—"}
+                  {e.lastNetPay != null ? formatCurrency(e.lastNetPay) : "—"}
                 </td>
                 <td className="px-4 py-3">
                   <RiskBadge level={e.riskLevel} />

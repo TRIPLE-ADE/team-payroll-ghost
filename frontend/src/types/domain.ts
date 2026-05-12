@@ -22,6 +22,9 @@ export type VerificationStatus = "current" | "expiring" | "expired";
 
 export type AnomalySensitivity = "low" | "standard" | "high";
 
+/** Nigerian Naira only for now — all monetary fields use whole naira unless stated otherwise. */
+export const APP_CURRENCY_CODE = "NGN" as const;
+
 export interface TrustPoint {
   at: string;
   score: number;
@@ -190,4 +193,46 @@ export interface SystemSettings {
   anomalySensitivity: AnomalySensitivity;
   notifyReviewersEmail: boolean;
   notifyEscalationsSlack: boolean;
+}
+
+/** Dashboard strip; same shape as payroll cycle list rows (NGN amounts). */
+export type PayrollCycleBrief = PayrollCycleSummary;
+
+export interface TreasuryWallet {
+  balanceAmount: number;
+  availableAmount: number;
+  pendingSettlementAmount: number;
+  virtualAccountNumber: string;
+  bankName: string;
+  accountName: string;
+  lastSyncedAt: string;
+  squadMerchantRef?: string;
+}
+
+export interface LiquiditySnapshot {
+  pausedPaymentsTotalAmount: number;
+  scheduledPayrollTotalAmount: number;
+  heldCount: number;
+  asOf: string;
+}
+
+export type SquadLedgerDirection = "credit" | "debit" | "hold" | "release";
+
+export interface SquadLedgerEntry {
+  id: string;
+  at: string;
+  title: string;
+  detail?: string;
+  amount?: number;
+  direction: SquadLedgerDirection;
+  squadRef?: string;
+  relatedCycleId?: string;
+  relatedEmployeeId?: string;
+}
+
+export interface OperationalQueueStats {
+  openFlagsCount: number;
+  openInvestigationsCount: number;
+  oldestOpenInvestigationAgeHours: number;
+  pausedAmountOnHold: number;
 }
