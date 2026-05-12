@@ -1,3 +1,4 @@
+import { DEFAULT_SYSTEM_SETTINGS } from "@/stores/settings-store";
 import type {
   AuditEvent,
   DepartmentRisk,
@@ -10,13 +11,19 @@ import type {
   Investigation,
   InvestigationActionType,
   InvestigationStatus,
+  LiquiditySnapshot,
+  OperationalQueueStats,
   PaymentInterventionRow,
   PaymentStatus,
+  PayrollCycleBrief,
   PayrollCycleDetail,
   PayrollCycleSummary,
   RiskSeverity,
+  SquadLedgerEntry,
+  SystemSettings,
   ThreatFeedItem,
   TrendPoint,
+  TreasuryWallet,
 } from "@/types/domain";
 
 const cycleId = "cy-may-2026";
@@ -407,6 +414,59 @@ const cycles: PayrollCycleDetail[] = [
   },
 ];
 
+let treasuryWallet: TreasuryWallet = {
+  balanceAmount: 48_250_000,
+  availableAmount: 47_800_000,
+  pendingSettlementAmount: 450_000,
+  virtualAccountNumber: "9988776655123",
+  bankName: "Access Bank (Squad virtual)",
+  accountName: "Northfield Consortium · Payroll Float",
+  lastSyncedAt: new Date().toISOString(),
+  squadMerchantRef: "sqd_mrch_demo_01",
+};
+
+let squadLedger: SquadLedgerEntry[] = [
+  {
+    id: "sl-seed-1",
+    at: new Date(Date.now() - 86400000 * 5).toISOString(),
+    title: "Virtual account credit",
+    detail: "GTBank transfer — treasury top-up",
+    amount: 5_000_000,
+    direction: "credit",
+    squadRef: "SQUAD-VA-IN-7721",
+  },
+  {
+    id: "sl-seed-2",
+    at: new Date(Date.now() - 86400000 * 2).toISOString(),
+    title: "Disbursement batch reserved",
+    detail: "May 2026 biweekly — payroll float ring-fenced",
+    amount: 4_289_000,
+    direction: "debit",
+    squadRef: "SQUAD-RSV-MAY06",
+    relatedCycleId: cycleId,
+  },
+  {
+    id: "sl-seed-3",
+    at: new Date(Date.now() - 3600000 * 8).toISOString(),
+    title: "Integrity hold applied",
+    detail: "emp-204 scheduled net pay frozen pending review",
+    amount: 30_400,
+    direction: "hold",
+    squadRef: "SQUAD-HOLD-204",
+    relatedEmployeeId: "emp-204",
+    relatedCycleId: cycleId,
+  },
+  {
+    id: "sl-seed-4",
+    at: new Date(Date.now() - 3600000 * 3).toISOString(),
+    title: "Stakeholder notification",
+    detail: "Squad webhook — hold acknowledged by treasury",
+    direction: "hold",
+    squadRef: "SQUAD-WH-ACK-4412",
+    relatedEmployeeId: "emp-204",
+  },
+];
+
 function riskFromTrust(score: number): RiskSeverity {
   if (score < 55) return "high";
   if (score < 75) return "medium";
@@ -591,6 +651,91 @@ function pushAudit(event: Omit<AuditEvent, "id" | "at"> & { at?: string }) {
   });
 }
 
+function touchTreasurySync() {
+  treasuryWallet = { ...treasuryWallet, lastSyncedAt: new Date().toISOString() };
+}
+
+function pushSquadLedger(entry: Omit<SquadLedgerEntry, "id"> & { id?: string }) {
+  const id =
+    entry.id ?? `sl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const next: SquadLedgerEntry = {
+    id,
+    at: entry.at,
+    title: entry.title,
+    detail: entry.detail,
+    amount: entry.amount,
+    direction: entry.direction,
+    squadRef: entry.squadRef,
+    relatedCycleId: entry.relatedCycleId,
+    relatedEmployeeId: entry.relatedEmployeeId,
+  };
+  squadLedger = [next, ...squadLedger].slice(0, 40);
+}
+
+function getCurrentOperationalCycle(): PayrollCycleDetail | null {
+  return (
+    cycles.find(
+      (c) => c.processingStatus === "ready" || c.processingStatus === "analyzing",
+    ) ?? null
+  );
+}
+
+function toCycleBrief(c: PayrollCycleDetail): PayrollCycleBrief {
+  return {
+    id: c.id,
+    label: c.label,
+    uploadedAt: c.uploadedAt,
+    totalEmployees: c.totalEmployees,
+    totalDisbursement: c.totalDisbursement,
+    flaggedCount: c.flaggedCount,
+    pausedPayments: c.pausedPayments,
+    integrityScore: c.integrityScore,
+    processingStatus: c.processingStatus,
+    sourceFile: c.sourceFile,
+  };
+}
+
+function buildLiquiditySnapshot(): LiquiditySnapshot {
+  syncOverviewFromRows();
+  const interventions = buildPaymentInterventions();
+  const pausedPaymentsTotalAmount = interventions
+    .filter((i) => i.state === "paused")
+    .reduce((s, i) => s + i.netAmount, 0);
+  const current = getCurrentOperationalCycle();
+  return {
+    pausedPaymentsTotalAmount,
+    scheduledPayrollTotalAmount: current?.totalDisbursement ?? 0,
+    heldCount: overview.pausedPayments,
+    asOf: new Date().toISOString(),
+  };
+}
+
+function buildOperationalQueueStats(): OperationalQueueStats {
+  syncOverviewFromRows();
+  const interventions = buildPaymentInterventions();
+  const pausedAmountOnHold = interventions
+    .filter((i) => i.state === "paused")
+    .reduce((s, i) => s + i.netAmount, 0);
+  const openInv = Object.values(investigationsData).filter(
+    (i) => i.status !== "closed",
+  );
+  const oldestHours =
+    openInv.length > 0
+      ? Math.max(
+          ...openInv.map(
+            (i) => (Date.now() - new Date(i.openedAt).getTime()) / 3600000,
+          ),
+        )
+      : 0;
+  return {
+    openFlagsCount: overview.flaggedDisbursements,
+    openInvestigationsCount: overview.activeInvestigations,
+    oldestOpenInvestigationAgeHours:
+      Math.round(oldestHours * 10) / 10,
+    pausedAmountOnHold,
+  };
+}
+
 export const mockApi = {
   async getOverview() {
     syncOverviewFromRows();
@@ -685,6 +830,38 @@ export const mockApi = {
     return delay(100, buildPaymentInterventions());
   },
 
+  async getTreasuryWallet(): Promise<TreasuryWallet> {
+    return delay(130, structuredClone(treasuryWallet));
+  },
+
+  async getLiquiditySnapshot(): Promise<LiquiditySnapshot> {
+    return delay(100, structuredClone(buildLiquiditySnapshot()));
+  },
+
+  async getCurrentPayrollCycleBrief(): Promise<PayrollCycleBrief | null> {
+    syncOverviewFromRows();
+    const cur = getCurrentOperationalCycle();
+    return delay(
+      90,
+      cur ? structuredClone(toCycleBrief(cur)) : null,
+    );
+  },
+
+  async getRecentSquadLedger(limit = 10): Promise<SquadLedgerEntry[]> {
+    return delay(
+      100,
+      structuredClone(squadLedger.slice(0, Math.min(limit, 20))),
+    );
+  },
+
+  async getOperationalQueueStats(): Promise<OperationalQueueStats> {
+    return delay(100, structuredClone(buildOperationalQueueStats()));
+  },
+
+  async getSystemSettings(): Promise<SystemSettings> {
+    return delay(80, structuredClone(DEFAULT_SYSTEM_SETTINGS));
+  },
+
   async getRelationshipContext(employeeId: string) {
     const nodes = structuredClone(graphNodes);
     const edges = structuredClone(graphEdges);
@@ -724,6 +901,15 @@ export const mockApi = {
       actor: "operator.upload",
       refId: id,
     });
+    pushSquadLedger({
+      at: new Date().toISOString(),
+      title: "Batch received",
+      detail: `${input.fileName} — ${input.employeeCount} rows staged for analysis`,
+      squadRef: `SQUAD-ING-${id.split("-").pop()}`,
+      direction: "credit",
+      relatedCycleId: id,
+    });
+    touchTreasurySync();
     return delay(250, { id });
   },
 
@@ -762,6 +948,15 @@ export const mockApi = {
       refId: cycleId,
     });
     syncOverviewFromRows();
+    pushSquadLedger({
+      at: new Date().toISOString(),
+      title: "Integrity analysis complete",
+      detail: `${c.flaggedCount} case(s) queued · score ${c.integrityScore}`,
+      direction: "hold",
+      squadRef: `SQUAD-ANA-${cycleId.replace(/\D/g, "").slice(-6)}`,
+      relatedCycleId: cycleId,
+    });
+    touchTreasurySync();
     return delay(100, { ok: true, message: "Analysis complete" });
   },
 
@@ -774,6 +969,14 @@ export const mockApi = {
 
     const cycle = cycles.find((c) => c.id === inv.cycleId);
     const row = cycle?.flaggedRows.find((r) => r.employeeId === inv.employeeId);
+    const netAmount = row
+      ? row.trustScore < 50
+        ? 30400
+        : row.trustScore < 65
+          ? 9900
+          : 9200
+      : undefined;
+
 
     let nextPayment: PaymentStatus | undefined;
     let nextStatus: InvestigationStatus | undefined;
@@ -787,6 +990,16 @@ export const mockApi = {
         actor: "operator.console",
         refId: investigationId,
       });
+      pushSquadLedger({
+        at: new Date().toISOString(),
+        title: "Integrity hold applied",
+        detail: `${inv.employeeId} — scheduled net pay paused`,
+        amount: netAmount,
+        direction: "hold",
+        squadRef: `SQUAD-HOLD-${inv.employeeId.slice(-3)}-${Date.now().toString(36).slice(-4)}`,
+        relatedCycleId: inv.cycleId,
+        relatedEmployeeId: inv.employeeId,
+      });
     } else if (type === "approve_payment") {
       nextPayment = "approved";
       nextStatus = "closed";
@@ -797,6 +1010,16 @@ export const mockApi = {
         actor: "operator.console",
         refId: investigationId,
       });
+      pushSquadLedger({
+        at: new Date().toISOString(),
+        title: "Hold released",
+        detail: `${inv.employeeId} cleared for disbursement`,
+        amount: netAmount,
+        direction: "release",
+        squadRef: `SQUAD-REL-${inv.employeeId.slice(-3)}-${Date.now().toString(36).slice(-4)}`,
+        relatedCycleId: inv.cycleId,
+        relatedEmployeeId: inv.employeeId,
+      });
     } else if (type === "escalate") {
       nextStatus = "escalated";
       pushAudit({
@@ -806,6 +1029,15 @@ export const mockApi = {
         actor: "operator.console",
         refId: investigationId,
       });
+      pushSquadLedger({
+        at: new Date().toISOString(),
+        title: "Case escalated",
+        detail: `${investigationId} forwarded to tier-2`,
+        direction: "hold",
+        squadRef: `SQUAD-ESC-${investigationId.replace(/\D/g, "").slice(-4)}`,
+        relatedCycleId: inv.cycleId,
+        relatedEmployeeId: inv.employeeId,
+      });
     } else if (type === "request_verification") {
       pushAudit({
         type: "verification",
@@ -814,12 +1046,23 @@ export const mockApi = {
         actor: "operator.console",
         refId: investigationId,
       });
+      pushSquadLedger({
+        at: new Date().toISOString(),
+        title: "Verification refresh requested",
+        detail: `${inv.employeeId} — IDV workflow`,
+        direction: "hold",
+        squadRef: `SQUAD-IDV-${inv.employeeId.slice(-3)}`,
+        relatedEmployeeId: inv.employeeId,
+        relatedCycleId: inv.cycleId,
+      });
     }
 
     if (row && nextPayment) row.paymentStatus = nextPayment;
     if (nextStatus) inv.status = nextStatus;
 
     syncOverviewFromRows();
+
+    touchTreasurySync();
 
     return delay(200, { ok: true, message: "Action recorded" });
   },

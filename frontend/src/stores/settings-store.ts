@@ -6,7 +6,7 @@ type SettingsState = SystemSettings & {
   setPartial: (p: Partial<SystemSettings>) => void;
 };
 
-const defaults: SystemSettings = {
+export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   institutionName: "Northfield Consortium",
   riskTrustFloor: 55,
   anomalySensitivity: "standard",
@@ -17,7 +17,7 @@ const defaults: SystemSettings = {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      ...defaults,
+      ...DEFAULT_SYSTEM_SETTINGS,
       setPartial: (p) => set((s) => ({ ...s, ...p })),
     }),
     {

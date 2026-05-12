@@ -187,7 +187,12 @@ export function InvestigationWorkspace({ id }: { id: string }) {
             </h2>
             <div className="h-48 min-h-[192px] w-full min-w-0">
               <ClientOnlyChart>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  minWidth={0}
+                  initialDimension={{ width: 390, height: 192 }}
+                >
                   <LineChart
                     data={inv.trustSeries.map((t) => ({
                       ...t,
@@ -234,7 +239,7 @@ export function InvestigationWorkspace({ id }: { id: string }) {
                   transition={{ delay: idx * 0.06 }}
                   className="relative"
                 >
-                  <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border border-zinc-600 bg-zinc-900" />
+                  <span className="absolute left-[-21px] top-1.5 h-2.5 w-2.5 rounded-full border border-zinc-600 bg-zinc-900" />
                   <div className="flex flex-wrap items-center gap-2">
                     <RiskBadge level={ev.severity} />
                     <span className="font-mono text-[10px] text-zinc-500">
