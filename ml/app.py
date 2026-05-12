@@ -63,7 +63,7 @@ swagger_template = {
 }
 swagger = Swagger(app, template=swagger_template)
 
-# ── SQLite audit DB ───────────────────────────────────────────────────────────
+
 def get_db():
     if "db" not in g:
         g.db = sqlite3.connect(str(DATA_DIR / "audit.db"))
@@ -82,7 +82,6 @@ def close_db(e):
     db = g.pop("db", None)
     if db: db.close()
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
 def anon(v):
     return hashlib.sha256(f"{SALT}{str(v)}".encode()).hexdigest()[:20]
 
@@ -111,7 +110,6 @@ def score_employee(record: dict, context_bvns=None, context_nins=None, context_a
         "nin_shared":  int(nin_hash  in (context_nins  or set())),
     }
 
-    # Layer 1 — Heuristics
     hs = 0
     flags = []
     if feat["acct_shared"]:
@@ -187,10 +185,6 @@ def score_employee(record: dict, context_bvns=None, context_nins=None, context_a
         },
         "validation_warnings": warnings,
     }
-
-# ══════════════════════════════════════════════════════════════════════════════
-# ROUTES
-# ══════════════════════════════════════════════════════════════════════════════
 
 @app.route("/")
 def index():
