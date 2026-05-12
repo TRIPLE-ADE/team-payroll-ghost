@@ -507,6 +507,7 @@ def audit_history():
 
 if __name__ == "__main__":
     os.chdir(BASE)
-    print("[GhostGuard] Starting API server...")
-    print("[GhostGuard] Swagger docs → http://localhost:5000/apidocs")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 8080))
+    print(f"[GhostGuard] Starting API server on port {port}...")
+    print(f"[GhostGuard] Swagger docs → http://localhost:{port}/apidocs")
+    app.run(host="0.0.0.0", port=port, debug=False)

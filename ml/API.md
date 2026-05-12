@@ -3,7 +3,7 @@
 ## Base URL
 
 ```text id="x8v2kp"
-http://127.0.0.1:5000
+https://ghostguard-ml-179103012566.us-central1.run.app
 ```
 
 ```
