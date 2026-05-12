@@ -263,17 +263,17 @@ def analyze_employee():
           type: object
           required: [emp_id, salary, grade_level, tenure_months]
           properties:
-            emp_id:             {type: string, example: "EMP001234"}
-            bvn:                {type: string, example: "22345678901", description: "11-digit CBN BVN"}
-            nin:                {type: string, example: "12345678901", description: "11-digit NIMC NIN"}
-            account_number:     {type: string, example: "0123456789",  description: "10-digit NUBAN"}
-            grade_level:        {type: string, example: "GL-09"}
-            salary:             {type: number, example: 280000}
-            tenure_months:      {type: integer, example: 36}
-            avg_attendance_days:{type: number,  example: 2}
-            months_no_deduction:{type: integer, example: 36}
-            leave_days_taken:   {type: integer, example: 0}
-            promotion_count:    {type: integer, example: 0}
+            emp_id: {type: string, example: "EMP001234"}
+            bvn: {type: string, example: "22345678901", description: "11-digit CBN BVN"}
+            nin: {type: string, example: "12345678901", description: "11-digit NIMC NIN"}
+            account_number: {type: string, example: "0123456789", description: "10-digit NUBAN"}
+            grade_level: {type: string, example: "GL-09"}
+            salary: {type: number, example: 280000}
+            tenure_months: {type: integer, example: 36}
+            avg_attendance_days: {type: number, example: 2}
+            months_no_deduction: {type: integer, example: 36}
+            leave_days_taken: {type: integer, example: 0}
+            promotion_count: {type: integer, example: 0}
     responses:
       200:
         description: Risk assessment
