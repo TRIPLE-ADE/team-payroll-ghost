@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
@@ -18,15 +18,19 @@ export const metadata: Metadata = {
   description: "Operational intelligence for payroll integrity monitoring",
 };
 
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} flex min-h-full flex-col bg-zinc-950 font-sans text-zinc-100 antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} flex min-h-full flex-col bg-background font-sans text-foreground antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

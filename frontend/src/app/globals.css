@@ -1,17 +1,80 @@
 @import "tailwindcss";
+@import "sonner/dist/styles.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  --background: #ffffff;
+  --foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #52525b;
+  --subtle-foreground: #71717a;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --surface: #fafafa;
+  --surface-elevated: #ffffff;
+  --input: #ffffff;
+  --ring: #18181b;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #09090b;
+    --foreground: #f4f4f5;
+    --muted: #18181b;
+    --muted-foreground: #a1a1aa;
+    --subtle-foreground: #71717a;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+    --card: #0c0c0e;
+    --card-foreground: #f4f4f5;
+    --surface: #09090b;
+    --surface-elevated: #18181b;
+    --input: #09090b;
+    --ring: #71717a;
+    color-scheme: dark;
+  }
+}
+
+.dark {
   --background: #09090b;
   --foreground: #f4f4f5;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --subtle-foreground: #71717a;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --card: #0c0c0e;
+  --card-foreground: #f4f4f5;
+  --surface: #09090b;
+  --surface-elevated: #18181b;
+  --input: #09090b;
+  --ring: #71717a;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+html,
 body {
   background: var(--background);
   color: var(--foreground);

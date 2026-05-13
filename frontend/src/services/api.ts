@@ -1,4 +1,3 @@
-import { DEFAULT_SYSTEM_SETTINGS } from "@/stores/settings-store";
 import type {
   AuditEvent,
   DepartmentRisk,
@@ -859,7 +858,16 @@ export const mockApi = {
   },
 
   async getSystemSettings(): Promise<SystemSettings> {
-    return delay(80, structuredClone(DEFAULT_SYSTEM_SETTINGS));
+    return delay(
+      80,
+      structuredClone({
+        institutionName: "Northfield Consortium",
+        riskTrustFloor: 55,
+        anomalySensitivity: "standard",
+        notifyReviewersEmail: true,
+        notifyEscalationsSlack: false,
+      } satisfies SystemSettings),
+    );
   },
 
   async getRelationshipContext(employeeId: string) {

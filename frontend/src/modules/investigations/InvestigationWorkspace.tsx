@@ -18,6 +18,7 @@ import {
   useInvestigationActionMutation,
   useRelationshipContext,
 } from "@/hooks/use-domain-queries";
+import { getApiErrorMessage } from "@/lib/axios-error";
 import { cn, formatCurrency, formatShortDate } from "@/lib/utils";
 import type { InvestigationActionType } from "@/types/domain";
 import Link from "next/link";
@@ -66,14 +67,35 @@ const actions: { type: InvestigationActionType; label: string; tone?: "danger" }
   ];
 
 export function InvestigationWorkspace({ id }: { id: string }) {
-  const { data, isLoading } = useInvestigation(id);
+  const { data, isLoading, isFetching, isError, error, isSuccess } =
+    useInvestigation(id);
   const mutation = useInvestigationActionMutation();
   const [banner, setBanner] = useState<string | null>(null);
 
-  if (isLoading || !data) {
+  if (isLoading || isFetching) {
     return (
       <div className="font-mono text-sm text-zinc-500">Loading workspace…</div>
     );
+  }
+
+  if (isError) {
+    return (
+      <div className="font-mono text-sm text-red-400">
+        {getApiErrorMessage(error)}
+      </div>
+    );
+  }
+
+  if (isSuccess && !data) {
+    return (
+      <div className="font-mono text-sm text-zinc-500">
+        Investigation not found.
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
   }
 
   const { investigation: inv, employee: emp } = data;
