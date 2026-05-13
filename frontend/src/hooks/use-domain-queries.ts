@@ -1,18 +1,34 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { mockApi } from "@/services/api";
+import { fetchAuditEvents } from "@/services/audit-api";
+import { fetchEmployeesDirectory } from "@/services/employees-api";
 import {
   fetchDepartmentRisk,
   fetchIntegrityOverview,
   fetchIntegrityTrends,
   fetchThreatFeed,
 } from "@/services/integrity-api";
-import { fetchInvestigations } from "@/services/investigations-api";
+import {
+  fetchInvestigationWorkspace,
+  fetchInvestigations,
+  submitInvestigationAction,
+} from "@/services/investigations-api";
 import {
   fetchLiquiditySnapshot,
   fetchOperationalQueueStats,
 } from "@/services/operations-api";
-import { fetchCurrentPayrollCycle } from "@/services/payroll-api";
+import {
+  fetchCurrentPayrollCycle,
+  fetchPayrollCycleDetail,
+  fetchPayrollCycles,
+  startPayrollCycleAnalysis,
+  uploadPayrollBatch,
+} from "@/services/payroll-api";
+import { fetchPaymentInterventions } from "@/services/payments-api";
+import {
+  fetchRelationshipContext,
+  fetchRelationshipsGraph,
+} from "@/services/relationships-api";
 import { fetchRecentSquadLedger } from "@/services/squad-api";
 import { fetchTreasuryWallet } from "@/services/treasury-api";
 import type { InvestigationActionType } from "@/types/domain";
@@ -85,13 +101,13 @@ export function useOperationalQueueStats() {
 }
 
 export function usePayrollCycles() {
-  return useQuery({ queryKey: qk.cycles, queryFn: () => mockApi.listPayrollCycles() });
+  return useQuery({ queryKey: qk.cycles, queryFn: fetchPayrollCycles });
 }
 
 export function usePayrollCycle(id: string | null) {
   return useQuery({
     queryKey: id ? qk.cycle(id) : ["payroll", "cycle", "none"],
-    queryFn: () => (id ? mockApi.getPayrollCycle(id) : Promise.resolve(null)),
+    queryFn: () => (id ? fetchPayrollCycleDetail(id) : Promise.resolve(null)),
     enabled: !!id,
   });
 }
@@ -106,7 +122,8 @@ export function useInvestigations() {
 export function useInvestigation(id: string | null) {
   return useQuery({
     queryKey: id ? qk.investigation(id) : ["investigation", "none"],
-    queryFn: () => (id ? mockApi.getInvestigation(id) : Promise.resolve(null)),
+    queryFn: () =>
+      id ? fetchInvestigationWorkspace(id) : Promise.resolve(null),
     enabled: !!id,
   });
 }
@@ -114,25 +131,25 @@ export function useInvestigation(id: string | null) {
 export function useRelationships() {
   return useQuery({
     queryKey: qk.relationships,
-    queryFn: () => mockApi.getRelationships(),
+    queryFn: fetchRelationshipsGraph,
   });
 }
 
 export function useAuditEvents() {
-  return useQuery({ queryKey: qk.audit, queryFn: () => mockApi.getAuditEvents() });
+  return useQuery({ queryKey: qk.audit, queryFn: fetchAuditEvents });
 }
 
 export function useEmployeesDirectory() {
   return useQuery({
     queryKey: qk.employees,
-    queryFn: () => mockApi.getEmployeesDirectory(),
+    queryFn: fetchEmployeesDirectory,
   });
 }
 
 export function usePaymentInterventions() {
   return useQuery({
     queryKey: qk.payments,
-    queryFn: () => mockApi.getPaymentInterventions(),
+    queryFn: fetchPaymentInterventions,
   });
 }
 
@@ -142,7 +159,9 @@ export function useRelationshipContext(employeeId: string | null) {
       ? qk.relationshipContext(employeeId)
       : ["relationships", "ctx", "none"],
     queryFn: () =>
-      employeeId ? mockApi.getRelationshipContext(employeeId) : Promise.resolve(null),
+      employeeId
+        ? fetchRelationshipContext(employeeId)
+        : Promise.resolve({ nodes: [], edges: [] }),
     enabled: !!employeeId,
   });
 }
@@ -150,8 +169,7 @@ export function useRelationshipContext(employeeId: string | null) {
 export function useUploadPayrollBatch() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { fileName: string; employeeCount: number }) =>
-      mockApi.uploadPayrollBatch(input),
+    mutationFn: uploadPayrollBatch,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.cycles });
       void qc.invalidateQueries({ queryKey: qk.cycleCurrent });
@@ -169,7 +187,7 @@ export function useUploadPayrollBatch() {
 export function useStartCycleAnalysis() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (cycleId: string) => mockApi.startCycleAnalysis(cycleId),
+    mutationFn: startPayrollCycleAnalysis,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.cycles });
       void qc.invalidateQueries({ queryKey: qk.cycleCurrent });
@@ -197,7 +215,7 @@ export function useInvestigationActionMutation() {
     }: {
       investigationId: string;
       type: InvestigationActionType;
-    }) => mockApi.submitInvestigationAction(investigationId, type),
+    }) => submitInvestigationAction(investigationId, type),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.overview });
       void qc.invalidateQueries({ queryKey: qk.cycles });
