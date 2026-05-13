@@ -16,7 +16,7 @@ import type {
   TreasuryWallet,
 } from "@/types/domain";
 
-import { useSettingsStore } from "@/stores/settings-store";
+import { useSystemSettings } from "@/hooks/use-domain-queries";
 import { cn, formatCurrency, formatShortDate } from "@/lib/utils";
 
 function CardSkeleton({ className }: { className?: string }) {
@@ -336,8 +336,9 @@ function sensitivityLabel(s: AnomalySensitivity) {
 }
 
 export function PolicyModeLine() {
-  const institutionName = useSettingsStore((s) => s.institutionName);
-  const anomalySensitivity = useSettingsStore((s) => s.anomalySensitivity);
+  const { data } = useSystemSettings();
+  const institutionName = data?.institutionName?.trim() || "—";
+  const anomalySensitivity = data?.anomalySensitivity ?? "standard";
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-4 py-2 font-mono text-[11px] text-zinc-500">
       <span className="text-zinc-400">{institutionName}</span>

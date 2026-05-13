@@ -30,8 +30,12 @@ import {
   fetchRelationshipsGraph,
 } from "@/services/relationships-api";
 import { fetchRecentSquadLedger } from "@/services/squad-api";
+import {
+  fetchSystemSettings,
+  updateSystemSettings,
+} from "@/services/settings-api";
 import { fetchTreasuryWallet } from "@/services/treasury-api";
-import type { InvestigationActionType } from "@/types/domain";
+import type { InvestigationActionType, SystemSettings } from "@/types/domain";
 
 export const qk = {
   overview: ["integrity", "overview"] as const,
@@ -53,6 +57,7 @@ export const qk = {
   audit: ["audit"] as const,
   employees: ["employees", "directory"] as const,
   payments: ["payments", "interventions"] as const,
+  settings: ["settings", "system"] as const,
 };
 
 export function useIntegrityOverview() {
@@ -230,6 +235,24 @@ export function useInvestigationActionMutation() {
       void qc.invalidateQueries({ queryKey: qk.employees });
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "investigation" });
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "payroll" });
+    },
+  });
+}
+
+export function useSystemSettings() {
+  return useQuery({
+    queryKey: qk.settings,
+    queryFn: fetchSystemSettings,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useUpdateSystemSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SystemSettings) => updateSystemSettings(body),
+    onSuccess: (updated) => {
+      qc.setQueryData(qk.settings, updated);
     },
   });
 }

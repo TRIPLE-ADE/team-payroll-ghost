@@ -4,6 +4,7 @@ import Link from "next/link";
 import { memo } from "react";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppShellProfileMenu } from "@/components/AppShellProfileMenu";
 
 import { cn } from "@/lib/utils";
 
@@ -181,8 +182,9 @@ export function AppShellHeader({
       <span className="font-mono text-xs text-muted-foreground">
         PayGuard · <span className="text-amber-500 dark:text-amber-500/80">SANDBOX</span>
       </span>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
+        <AppShellProfileMenu />
       </div>
     </header>
   );
