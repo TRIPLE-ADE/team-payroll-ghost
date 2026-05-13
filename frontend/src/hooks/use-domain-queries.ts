@@ -1,5 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
 import { mockApi } from "@/services/api";
+import {
+  fetchDepartmentRisk,
+  fetchIntegrityOverview,
+  fetchIntegrityTrends,
+  fetchThreatFeed,
+} from "@/services/integrity-api";
+import { fetchInvestigations } from "@/services/investigations-api";
+import {
+  fetchLiquiditySnapshot,
+  fetchOperationalQueueStats,
+} from "@/services/operations-api";
+import { fetchCurrentPayrollCycle } from "@/services/payroll-api";
+import { fetchRecentSquadLedger } from "@/services/squad-api";
+import { fetchTreasuryWallet } from "@/services/treasury-api";
 import type { InvestigationActionType } from "@/types/domain";
 
 export const qk = {
@@ -25,53 +40,47 @@ export const qk = {
 };
 
 export function useIntegrityOverview() {
-  return useQuery({ queryKey: qk.overview, queryFn: () => mockApi.getOverview() });
+  return useQuery({ queryKey: qk.overview, queryFn: fetchIntegrityOverview });
 }
 
 export function useThreatFeed() {
-  return useQuery({ queryKey: qk.threat, queryFn: () => mockApi.getThreatFeed() });
+  return useQuery({ queryKey: qk.threat, queryFn: fetchThreatFeed });
 }
 
 export function useDepartmentRisk() {
-  return useQuery({ queryKey: qk.dept, queryFn: () => mockApi.getDepartmentRisk() });
+  return useQuery({ queryKey: qk.dept, queryFn: fetchDepartmentRisk });
 }
 
 export function useIntegrityTrends() {
-  return useQuery({ queryKey: qk.trends, queryFn: () => mockApi.getTrends() });
+  return useQuery({ queryKey: qk.trends, queryFn: fetchIntegrityTrends });
 }
 
 export function useTreasuryWallet() {
-  return useQuery({
-    queryKey: qk.treasury,
-    queryFn: () => mockApi.getTreasuryWallet(),
-  });
+  return useQuery({ queryKey: qk.treasury, queryFn: fetchTreasuryWallet });
 }
 
 export function useLiquiditySnapshot() {
-  return useQuery({
-    queryKey: qk.liquidity,
-    queryFn: () => mockApi.getLiquiditySnapshot(),
-  });
+  return useQuery({ queryKey: qk.liquidity, queryFn: fetchLiquiditySnapshot });
 }
 
 export function useCurrentPayrollCycleBrief() {
   return useQuery({
     queryKey: qk.cycleCurrent,
-    queryFn: () => mockApi.getCurrentPayrollCycleBrief(),
+    queryFn: fetchCurrentPayrollCycle,
   });
 }
 
 export function useRecentSquadLedger(limit = 8) {
   return useQuery({
     queryKey: [...qk.squadLedger, limit] as const,
-    queryFn: () => mockApi.getRecentSquadLedger(limit),
+    queryFn: () => fetchRecentSquadLedger(limit),
   });
 }
 
 export function useOperationalQueueStats() {
   return useQuery({
     queryKey: qk.queueStats,
-    queryFn: () => mockApi.getOperationalQueueStats(),
+    queryFn: fetchOperationalQueueStats,
   });
 }
 
@@ -90,7 +99,7 @@ export function usePayrollCycle(id: string | null) {
 export function useInvestigations() {
   return useQuery({
     queryKey: qk.investigations,
-    queryFn: () => mockApi.listInvestigations(),
+    queryFn: fetchInvestigations,
   });
 }
 

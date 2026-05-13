@@ -19,7 +19,7 @@ export function useLoginMutation() {
       return loginRequest(body);
     },
     onSuccess: (data) => {
-      setAccessToken(data.access_token);
+      setAccessToken(data.accessToken);
       toast.success("Signed in successfully.");
       router.push("/dashboard");
       router.refresh();
