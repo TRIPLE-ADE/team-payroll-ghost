@@ -35,7 +35,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       role="radiogroup"
       aria-label="Color theme"
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-md border border-border bg-surface p-0.5 text-muted-foreground",
+        "inline-flex shrink-0 items-center gap-0.5 rounded-md border border-border bg-muted/90 p-0.5 text-muted-foreground backdrop-blur-sm",
         className,
       )}
     >
@@ -52,11 +52,11 @@ export function ThemeToggle({ className }: { className?: string }) {
             title={opt.label}
             onClick={() => setTheme(opt.value)}
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded transition-colors",
-              "hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              "flex h-7 w-7 items-center justify-center rounded-sm transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               selected
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground",
+                ? "bg-foreground text-background shadow-sm"
+                : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
             )}
           >
             <Icon className="h-3.5 w-3.5" />

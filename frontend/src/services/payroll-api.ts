@@ -33,13 +33,12 @@ export async function fetchPayrollCycleDetail(
   }
 }
 
-export async function uploadPayrollBatch(input: {
-  fileName: string;
-  employeeCount: number;
-}): Promise<{ id: string }> {
+export async function uploadPayrollBatch(file: File): Promise<{ id: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
   const { data } = await http.post<{ id: string }>(
     "/api/v1/payroll/cycles",
-    input,
+    formData,
   );
   return data;
 }

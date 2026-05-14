@@ -13,6 +13,7 @@ import "@xyflow/react/dist/style.css";
 import { RiskBadge } from "@/components/RiskBadge";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useRelationships } from "@/hooks/use-domain-queries";
+import { getApiErrorMessage } from "@/lib/axios-error";
 import { cn } from "@/lib/utils";
 import type { GraphEdge, GraphNode, RiskSeverity } from "@/types/domain";
 
@@ -69,7 +70,7 @@ function mapEdges(edges: GraphEdge[]): Edge[] {
 export function RelationshipIntel() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
-  const { data } = useRelationships();
+  const { data, isPending, isError, error, isFetching } = useRelationships();
   const [kind, setKind] = useState<"all" | GraphNode["type"]>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -164,11 +165,22 @@ export function RelationshipIntel() {
             {label}
           </button>
         ))}
+        {isFetching && !isPending ? (
+          <span className="font-mono text-[10px] text-zinc-500">Refreshing…</span>
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <div className="h-[480px] rounded-xl border border-zinc-800/80 bg-zinc-950">
-          {data ? (
+          {isPending ? (
+            <div className="flex h-full items-center justify-center font-mono text-sm text-zinc-500">
+              Loading graph…
+            </div>
+          ) : isError ? (
+            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-red-400">
+              {getApiErrorMessage(error)}
+            </div>
+          ) : (
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -183,10 +195,6 @@ export function RelationshipIntel() {
               <Background color="#27272a" gap={16} />
               <Controls />
             </ReactFlow>
-          ) : (
-            <div className="flex h-full items-center justify-center font-mono text-sm text-zinc-500">
-              Loading graph…
-            </div>
           )}
         </div>
         <aside className="space-y-3">
@@ -229,23 +237,41 @@ export function RelationshipIntel() {
               Node index
             </h2>
             <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto">
-              {filteredNodes.map((n) => (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(n.id)}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-md border px-2 py-2 text-left font-mono text-[11px]",
-                      selectedId === n.id
-                        ? "border-zinc-500 bg-zinc-800/50"
-                        : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900",
-                    )}
-                  >
-                    <span className="text-xs font-medium text-zinc-200">{n.label}</span>
-                    {n.risk ? <RiskBadge level={n.risk} /> : null}
-                  </button>
+              {isPending ? (
+                <li className="px-2 py-2 font-mono text-[11px] text-zinc-500">
+                  Loading nodes…
                 </li>
-              ))}
+              ) : isError ? (
+                <li className="px-2 py-2 text-xs text-red-400">
+                  {getApiErrorMessage(error)}
+                </li>
+              ) : filteredNodes.length === 0 ? (
+                <li className="px-2 py-2 text-xs text-zinc-500">
+                  {(data?.nodes ?? []).length === 0
+                    ? "No relationship graph data yet."
+                    : "No nodes match this surface filter."}
+                </li>
+              ) : (
+                filteredNodes.map((n) => (
+                  <li key={n.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(n.id)}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-md border px-2 py-2 text-left font-mono text-[11px]",
+                        selectedId === n.id
+                          ? "border-zinc-500 bg-zinc-800/50"
+                          : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900",
+                      )}
+                    >
+                      <span className="text-xs font-medium text-zinc-200">
+                        {n.label}
+                      </span>
+                      {n.risk ? <RiskBadge level={n.risk} /> : null}
+                    </button>
+                  </li>
+                ))
+              )}
             </ul>
           </div>
         </aside>

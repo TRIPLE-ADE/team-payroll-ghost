@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+
 import { RiskBadge } from "@/components/RiskBadge";
 import { SectionTitle } from "@/components/SectionTitle";
 import {
@@ -9,6 +10,7 @@ import {
   useStartCycleAnalysis,
   useUploadPayrollBatch,
 } from "@/hooks/use-domain-queries";
+import { getApiErrorMessage } from "@/lib/axios-error";
 import { cn, formatCurrency, formatShortDate } from "@/lib/utils";
 import type { PayrollProcessingStatus, RiskSeverity } from "@/types/domain";
 
@@ -71,28 +73,36 @@ function severityFromFlagged(n: number): RiskSeverity {
 }
 
 export function PayrollCycles() {
-  const { data: cycles, isFetching } = usePayrollCycles();
+  const { data: cycles, isFetching, isPending, isError, error } =
+    usePayrollCycles();
   const upload = useUploadPayrollBatch();
   const analyze = useStartCycleAnalysis();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [empCount, setEmpCount] = useState("1850");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const onPickFile = () => fileRef.current?.click();
-
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setSelectedFile(f);
     setMsg(null);
-    upload.mutate(
-      { fileName: f.name, employeeCount: Number(empCount) || 850 },
-      {
-        onSuccess: () => setMsg(`Staged ${f.name}. Run analysis to open the review queue.`),
-        onError: () => setMsg("Upload failed (mock)."),
+  }
+
+  function onUpload() {
+    if (!selectedFile) return;
+    setMsg(null);
+    upload.mutate(selectedFile, {
+      onSuccess: () => {
+        setMsg(
+          `Staged ${selectedFile.name}. Run analysis on the batch row to open the review queue.`,
+        );
+        setSelectedFile(null);
+        if (fileRef.current) fileRef.current.value = "";
       },
-    );
-    e.target.value = "";
-  };
+      onError: (err) => {
+        setMsg(getApiErrorMessage(err));
+      },
+    });
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -103,29 +113,24 @@ export function PayrollCycles() {
 
       <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
         <h2 className="text-sm font-semibold text-zinc-200">Upload payroll CSV</h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          Staging ingests a batch identifier only (sandbox). Map to your ingest
-          pipeline when wiring production.
-        </p>
-        <div className="mt-4 flex flex-wrap items-end gap-3">
-          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
-          <label className="flex flex-col gap-1 text-xs text-zinc-500">
-            Expected rows
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <label className="block min-w-0 flex-1 text-xs text-zinc-500">
+            <span className="mb-1 block font-medium text-zinc-400">CSV file</span>
             <input
-              type="number"
-              min={1}
-              value={empCount}
-              onChange={(e) => setEmpCount(e.target.value)}
-              className="w-28 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-sm text-zinc-100"
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="block w-full max-w-md cursor-pointer text-sm text-zinc-200 file:mr-3 file:rounded-md file:border file:border-zinc-600 file:bg-zinc-950 file:px-3 file:py-2 file:text-xs file:font-medium file:text-zinc-100 hover:file:bg-zinc-800"
+              onChange={onFileChange}
             />
           </label>
           <button
             type="button"
-            onClick={onPickFile}
-            disabled={upload.isPending}
-            className="rounded-md border border-zinc-600 bg-zinc-950 px-4 py-2 text-sm text-zinc-100 hover:bg-zinc-800 disabled:opacity-50"
+            onClick={onUpload}
+            disabled={!selectedFile || upload.isPending}
+            className="shrink-0 rounded-md border border-zinc-600 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {upload.isPending ? "Uploading…" : "Choose CSV file"}
+            {upload.isPending ? "Uploading…" : "Upload"}
           </button>
         </div>
         {msg ? (
@@ -136,7 +141,7 @@ export function PayrollCycles() {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-200">Uploaded batches</h2>
-          {isFetching ? (
+          {isFetching && !isPending ? (
             <span className="font-mono text-[10px] text-zinc-500">Refreshing…</span>
           ) : null}
         </div>
@@ -147,14 +152,41 @@ export function PayrollCycles() {
                 <th className="px-4 py-3">Batch</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Ingested</th>
-                <th className="px-4 py-3">Employees</th>
                 <th className="px-4 py-3">Disbursement</th>
                 <th className="px-4 py-3">Flagged</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/80">
-              {(cycles ?? []).map((c) => {
+              {isPending ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-10 text-center text-sm text-zinc-500"
+                  >
+                    Loading batches…
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-10 text-center text-sm text-red-400"
+                  >
+                    {getApiErrorMessage(error)}
+                  </td>
+                </tr>
+              ) : (cycles ?? []).length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-10 text-center text-sm text-zinc-500"
+                  >
+                    No cycles
+                  </td>
+                </tr>
+              ) : (
+                (cycles ?? []).map((c) => {
                 const st = statusCopy(c.processingStatus);
                 const risk = severityFromFlagged(c.flaggedCount);
                 return (
@@ -174,9 +206,6 @@ export function PayrollCycles() {
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-zinc-400">
                       {formatShortDate(c.uploadedAt)}
-                    </td>
-                    <td className="px-4 py-3 font-mono tabular-nums text-zinc-200">
-                      {c.totalEmployees.toLocaleString()}
                     </td>
                     <td className="px-4 py-3 font-mono tabular-nums text-zinc-200">
                       {formatCurrency(c.totalDisbursement)}
@@ -219,12 +248,10 @@ export function PayrollCycles() {
                     </td>
                   </tr>
                 );
-              })}
+                })
+              )}
             </tbody>
           </table>
-          {!cycles?.length ? (
-            <div className="px-4 py-10 text-center text-sm text-zinc-500">No cycles</div>
-          ) : null}
         </div>
       </div>
     </div>
