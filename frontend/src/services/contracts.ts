@@ -21,6 +21,7 @@
  * GET  /api/v1/payments/interventions      -> PaymentInterventionRow[]
  * GET  /api/v1/audit/events                -> AuditEvent[]
  * GET  /api/v1/treasury/wallet             -> TreasuryWallet
+ * POST /api/v1/treasury/topups/initiate    -> TreasuryTopupInitiateResponse
  * GET  /api/v1/operations/liquidity       -> LiquiditySnapshot
  * GET  /api/v1/payroll/cycles/current      -> PayrollCycleBrief | null (no active run)
  * GET  /api/v1/squad/ledger/recent        -> SquadLedgerEntry[] (?limit=10)

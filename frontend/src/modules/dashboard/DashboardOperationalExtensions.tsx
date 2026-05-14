@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import type { UseQueryResult } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -17,7 +17,10 @@ import type {
   TreasuryWallet,
 } from "@/types/domain";
 
-import { useSystemSettings } from "@/hooks/use-domain-queries";
+import { useSystemSettings, useInitiateTreasuryTopup } from "@/hooks/use-domain-queries";
+import { useAuth } from "@/contexts/auth-context";
+import { getApiErrorMessage } from "@/lib/axios-error";
+import { emailFromAccessToken } from "@/lib/jwt-payload";
 import { cn, formatCurrency, formatShortDate } from "@/lib/utils";
 
 function CardSkeleton({ className }: { className?: string }) {
@@ -116,38 +119,76 @@ function parseNairaAmount(raw: string): number | null {
   return n;
 }
 
+const DEFAULT_TOPUP_PAYMENT_CHANNELS = ["card", "bank", "ussd"] as const;
+
 function TreasuryCheckoutModal({
   open,
   onOpenChange,
+  defaultEmail,
+  defaultCustomerName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultEmail: string;
+  defaultCustomerName: string;
 }) {
   const titleId = useId();
+  const initiate = useInitiateTreasuryTopup();
+
   const [amountRaw, setAmountRaw] = useState("");
+  const [email, setEmail] = useState(defaultEmail);
+  const [customerName, setCustomerName] = useState(defaultCustomerName);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onOpenChange(false);
+      if (e.key === "Escape" && !redirecting && !initiate.isPending) {
+        onOpenChange(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, redirecting, initiate.isPending]);
 
   const parsed = parseNairaAmount(amountRaw);
-  const valid =
+  const amountOk =
     parsed != null && parsed >= MIN_TOPUP_NAIRA && parsed <= 99_000_000_000;
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const nameOk = customerName.trim().length >= 2;
+  const busy = initiate.isPending || redirecting;
+  const canSubmit = amountOk && emailOk && nameOk && !busy;
 
-  function onContinue() {
-    if (!valid || parsed == null) return;
-    onOpenChange(false);
-    toast.info("Squad checkout is not wired yet.", {
-      description: `Requested top-up: ${formatCurrency(parsed)}. This will open Squad checkout once the treasury API is connected.`,
-    });
+  async function onContinue() {
+    if (!amountOk || !emailOk || !nameOk || parsed == null || busy) return;
+    setRedirecting(true);
+    try {
+      const res = await initiate.mutateAsync({
+        amount: parsed,
+        email: email.trim(),
+        customerName: customerName.trim(),
+        callbackUrl: `${window.location.origin}/dashboard?topup=callback`,
+        paymentChannels: [...DEFAULT_TOPUP_PAYMENT_CHANNELS],
+        passCharge: false,
+        metadata: {},
+      });
+      const url = res.checkoutUrl?.trim();
+      if (!url) {
+        setRedirecting(false);
+        toast.error("Checkout did not return a payment URL.");
+        return;
+      }
+      window.location.assign(url);
+    } catch (err) {
+      setRedirecting(false);
+      toast.error(getApiErrorMessage(err));
+    }
   }
 
   if (!open) return null;
+
+  const inputClass =
+    "mt-1.5 w-full rounded-md border border-border bg-input px-3 py-2 font-mono text-sm text-foreground outline-none ring-ring placeholder:text-muted-foreground focus:ring-2";
 
   return (
     <div
@@ -156,25 +197,28 @@ function TreasuryCheckoutModal({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/70 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-black/70 backdrop-blur-[1px] disabled:cursor-not-allowed"
         aria-label="Close funding dialog"
-        onClick={() => onOpenChange(false)}
+        disabled={busy}
+        onClick={() => {
+          if (!busy) onOpenChange(false);
+        }}
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-950 p-5 shadow-xl"
+        className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xl"
       >
-        <h2 id={titleId} className="text-sm font-semibold text-zinc-100">
+        <h2 id={titleId} className="text-sm font-semibold text-foreground">
           Fund payroll float
         </h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          Enter the amount you want to add via Squad checkout. You will be
-          redirected to complete payment once the backend is connected.
+        <p className="mt-1 text-xs text-muted-foreground">
+          Amount and payer details are sent to Squad. You will leave this app to
+          complete payment.
         </p>
         <label className="mt-4 block">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             Amount (NGN)
           </span>
           <input
@@ -184,35 +228,73 @@ function TreasuryCheckoutModal({
             placeholder="e.g. 500000"
             value={amountRaw}
             onChange={(e) => setAmountRaw(e.target.value)}
-            className="mt-1.5 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 outline-none ring-zinc-500 placeholder:text-zinc-600 focus:ring-2"
+            className={inputClass}
+            disabled={busy}
+          />
+        </label>
+        <label className="mt-3 block">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            Email (Squad receipt)
+          </span>
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputClass}
+            disabled={busy}
+          />
+        </label>
+        <label className="mt-3 block">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            Customer / account name
+          </span>
+          <input
+            type="text"
+            autoComplete="name"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            className={inputClass}
+            disabled={busy}
           />
         </label>
         {parsed != null && parsed > 0 && parsed < MIN_TOPUP_NAIRA ? (
-          <p className="mt-2 font-mono text-[11px] text-amber-200/90">
+          <p className="mt-2 font-mono text-[11px] text-amber-800 dark:text-amber-200/90">
             Minimum top-up is {formatCurrency(MIN_TOPUP_NAIRA)}.
           </p>
         ) : null}
-        {parsed != null && valid ? (
-          <p className="mt-2 font-mono text-[11px] text-zinc-500">
+        {email.length > 0 && !emailOk ? (
+          <p className="mt-2 font-mono text-[11px] text-amber-800 dark:text-amber-200/90">
+            Enter a valid email address.
+          </p>
+        ) : null}
+        {customerName.length > 0 && !nameOk ? (
+          <p className="mt-2 font-mono text-[11px] text-amber-800 dark:text-amber-200/90">
+            Customer name should be at least 2 characters.
+          </p>
+        ) : null}
+        {amountOk ? (
+          <p className="mt-2 font-mono text-[11px] text-muted-foreground">
             You are funding{" "}
-            <span className="text-zinc-300">{formatCurrency(parsed)}</span>
+            <span className="text-foreground">{formatCurrency(parsed!)}</span>
           </p>
         ) : null}
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="rounded-md border border-zinc-600 px-3 py-2 font-mono text-xs text-zinc-300 hover:bg-zinc-900"
+            disabled={busy}
+            className="rounded-md border border-border-strong px-3 py-2 font-mono text-xs text-foreground hover:bg-muted disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
-            disabled={!valid}
-            onClick={onContinue}
-            className="rounded-md border border-emerald-600/60 bg-emerald-600/15 px-3 py-2 font-mono text-xs text-emerald-100 hover:bg-emerald-600/25 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canSubmit}
+            onClick={() => void onContinue()}
+            className="rounded-md border border-emerald-600/60 bg-emerald-600/15 px-3 py-2 font-mono text-xs text-emerald-900 hover:bg-emerald-600/25 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-100"
           >
-            Continue to checkout
+            {busy ? "Opening Squad checkout…" : "Continue to checkout"}
           </button>
         </div>
       </div>
@@ -227,6 +309,21 @@ export function TreasuryFundingSection({
 }) {
   const [fundModalOpen, setFundModalOpen] = useState(false);
   const [fundModalKey, setFundModalKey] = useState(0);
+  const { accessToken } = useAuth();
+  const { data: settings } = useSystemSettings();
+
+  const defaultPayer = useMemo(() => {
+    const mail = emailFromAccessToken(accessToken) ?? "";
+    const inst = settings?.institutionName?.trim();
+    const name =
+      inst && inst.length > 0
+        ? inst
+        : mail
+          ? (mail.split("@")[0] ?? "Treasury payer")
+          : "";
+    return { email: mail, customerName: name };
+  }, [accessToken, settings?.institutionName]);
+
   const w = q.data;
   if (q.isPending) return <CardSkeleton className="min-h-[220px]" />;
   if (q.isError || !w) {
@@ -244,6 +341,8 @@ export function TreasuryFundingSection({
         key={fundModalKey}
         open={fundModalOpen}
         onOpenChange={setFundModalOpen}
+        defaultEmail={defaultPayer.email}
+        defaultCustomerName={defaultPayer.customerName}
       />
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-800/60 pb-3">
         <div>

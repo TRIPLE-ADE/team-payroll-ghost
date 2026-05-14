@@ -209,6 +209,38 @@ export interface TreasuryWallet {
   squadMerchantRef?: string;
 }
 
+export interface TreasuryTopupInitiateRequest {
+  amount: number;
+  email: string;
+  customerName: string;
+  callbackUrl: string;
+  paymentChannels: string[];
+  passCharge: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface TreasuryTopupInitiateResponse {
+  id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  transactionRef: string;
+  checkoutUrl: string;
+  callbackUrl: string;
+  customerEmail: string;
+  customerName: string;
+  paymentChannels: string[];
+  passCharge: boolean;
+  virtualAccountNumber?: string;
+  squadTransactionType?: string;
+  squadGatewayRef?: string;
+  squadMerchantId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+}
+
 export interface LiquiditySnapshot {
   pausedPaymentsTotalAmount: number;
   scheduledPayrollTotalAmount: number;

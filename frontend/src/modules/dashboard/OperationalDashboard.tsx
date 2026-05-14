@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import {
   Area,
   AreaChart,
@@ -15,6 +19,7 @@ import { ClientOnlyChart } from "@/components/ClientOnlyChart";
 import { RiskBadge } from "@/components/RiskBadge";
 import { SectionTitle } from "@/components/SectionTitle";
 import {
+  qk,
   useCurrentPayrollCycleBrief,
   useDepartmentRisk,
   useIntegrityOverview,
@@ -90,6 +95,11 @@ function DepartmentHeatmap({ rows }: { rows: DepartmentRisk[] }) {
 }
 
 export function OperationalDashboard() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const qc = useQueryClient();
+
   const overview = useIntegrityOverview();
   const feed = useThreatFeed();
   const dept = useDepartmentRisk();
@@ -109,6 +119,31 @@ export function OperationalDashboard() {
         new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime(),
     )
     .slice(0, 6);
+
+  useEffect(() => {
+    if (searchParams.get("topup") !== "callback") return;
+    const dedupe = searchParams.toString();
+    const storageKey = `payguard-topup-callback:${dedupe}`;
+    if (sessionStorage.getItem(storageKey) === "1") {
+      router.replace(pathname);
+      return;
+    }
+    sessionStorage.setItem(storageKey, "1");
+
+    const reference = searchParams.get("reference")?.trim() ?? "";
+
+    void qc.invalidateQueries({ queryKey: qk.treasury });
+    void qc.invalidateQueries({ queryKey: qk.squadLedger });
+    void qc.invalidateQueries({ queryKey: qk.liquidity });
+
+    toast.success("Back from Squad checkout", {
+      description: reference
+        ? `Reference ${reference}. Balance updates once your bank confirms payment (usually shortly).`
+        : "Balance updates once your bank confirms payment (usually shortly).",
+    });
+
+    router.replace(pathname);
+  }, [searchParams, pathname, router, qc]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
