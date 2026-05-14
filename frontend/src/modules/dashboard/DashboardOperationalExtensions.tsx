@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 
 import type { UseQueryResult } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import type {
   AnomalySensitivity,
@@ -105,11 +106,127 @@ function ledgerDirectionTone(d: SquadLedgerDirection): string {
   }
 }
 
+const MIN_TOPUP_NAIRA = 100;
+
+function parseNairaAmount(raw: string): number | null {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return null;
+  const n = Number.parseInt(digits, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+function TreasuryCheckoutModal({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const titleId = useId();
+  const [amountRaw, setAmountRaw] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onOpenChange]);
+
+  const parsed = parseNairaAmount(amountRaw);
+  const valid =
+    parsed != null && parsed >= MIN_TOPUP_NAIRA && parsed <= 99_000_000_000;
+
+  function onContinue() {
+    if (!valid || parsed == null) return;
+    onOpenChange(false);
+    toast.info("Squad checkout is not wired yet.", {
+      description: `Requested top-up: ${formatCurrency(parsed)}. This will open Squad checkout once the treasury API is connected.`,
+    });
+  }
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="presentation"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/70 backdrop-blur-[1px]"
+        aria-label="Close funding dialog"
+        onClick={() => onOpenChange(false)}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-950 p-5 shadow-xl"
+      >
+        <h2 id={titleId} className="text-sm font-semibold text-zinc-100">
+          Fund payroll float
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Enter the amount you want to add via Squad checkout. You will be
+          redirected to complete payment once the backend is connected.
+        </p>
+        <label className="mt-4 block">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+            Amount (NGN)
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="e.g. 500000"
+            value={amountRaw}
+            onChange={(e) => setAmountRaw(e.target.value)}
+            className="mt-1.5 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 outline-none ring-zinc-500 placeholder:text-zinc-600 focus:ring-2"
+          />
+        </label>
+        {parsed != null && parsed > 0 && parsed < MIN_TOPUP_NAIRA ? (
+          <p className="mt-2 font-mono text-[11px] text-amber-200/90">
+            Minimum top-up is {formatCurrency(MIN_TOPUP_NAIRA)}.
+          </p>
+        ) : null}
+        {parsed != null && valid ? (
+          <p className="mt-2 font-mono text-[11px] text-zinc-500">
+            You are funding{" "}
+            <span className="text-zinc-300">{formatCurrency(parsed)}</span>
+          </p>
+        ) : null}
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-md border border-zinc-600 px-3 py-2 font-mono text-xs text-zinc-300 hover:bg-zinc-900"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={onContinue}
+            className="rounded-md border border-emerald-600/60 bg-emerald-600/15 px-3 py-2 font-mono text-xs text-emerald-100 hover:bg-emerald-600/25 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Continue to checkout
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TreasuryFundingSection({
   q,
 }: {
   q: UseQueryResult<TreasuryWallet, Error>;
 }) {
+  const [fundModalOpen, setFundModalOpen] = useState(false);
+  const [fundModalKey, setFundModalKey] = useState(0);
   const w = q.data;
   if (q.isPending) return <CardSkeleton className="min-h-[220px]" />;
   if (q.isError || !w) {
@@ -123,6 +240,11 @@ export function TreasuryFundingSection({
 
   return (
     <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
+      <TreasuryCheckoutModal
+        key={fundModalKey}
+        open={fundModalOpen}
+        onOpenChange={setFundModalOpen}
+      />
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-800/60 pb-3">
         <div>
           <h2 className="text-sm font-semibold text-zinc-200">Payroll float</h2>
@@ -130,14 +252,16 @@ export function TreasuryFundingSection({
             Fund via Squad virtual account · {w.bankName}
           </p>
         </div>
-        <a
-          href="https://dashboard.squadco.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-[10px] text-zinc-500 hover:text-zinc-300"
-        >
-          Open Squad →
-        </a>
+          <button
+            type="button"
+            onClick={() => {
+              setFundModalKey((k) => k + 1);
+              setFundModalOpen(true);
+            }}
+            className="rounded-md border border-emerald-600/50 bg-emerald-600/10 px-3 py-1.5 font-mono text-[11px] text-emerald-100 hover:bg-emerald-600/20"
+          >
+            Fund with checkout
+          </button>
       </div>
 
       <div className="mt-4 grid gap-6 sm:grid-cols-2">
