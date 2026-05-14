@@ -164,7 +164,7 @@ export function AppShellHeader({
   onToggleNav: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/70 md:px-6">
+    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-4 md:px-6">
       <button
         type="button"
         className="-ml-1 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
@@ -179,7 +179,7 @@ export function AppShellHeader({
           <MenuIcon className="h-5 w-5" />
         )}
       </button>
-      <span className="font-mono text-xs text-muted-foreground">
+      <span className="font-mono font-bold text-xs text-muted-foreground">
         PayGuard · <span className="text-amber-500 dark:text-amber-500/80">SANDBOX</span>
       </span>
       <div className="ml-auto flex items-center gap-2">
