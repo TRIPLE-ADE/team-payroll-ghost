@@ -11,8 +11,11 @@ from app.routers import operations, treasury, squad
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        print(f"⚠️  Database initialization failed (non-critical): {e}")
     yield
 
 

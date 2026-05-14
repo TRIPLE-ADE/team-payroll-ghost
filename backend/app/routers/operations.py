@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models.payroll import FlaggedRow, PaymentAction, PayrollCycle
+from app.models.payment import PaymentAction
+from app.models.payroll import FlaggedRow, PayrollCycle
 from app.models.investigation import Investigation
 from app.schemas.operations import LiquidityStats, QueueStats
 
@@ -33,8 +34,10 @@ async def get_liquidity_stats(db: AsyncSession = Depends(get_db), user=Depends(g
         .order_by(PayrollCycle.uploaded_at.desc())
         .limit(1)
     )
-    cycle = cycle_result.scalar_one_or_none()
-    scheduled_total = int(cycle.total_disbursement) if cycle else 0
+    # scalar_one_or_none() on a single-column select returns the value directly,
+    # not a row object — so `cycle_total` is the Decimal (or None), not a PayrollCycle.
+    cycle_total = cycle_result.scalar_one_or_none()
+    scheduled_total = int(cycle_total) if cycle_total is not None else 0
 
     # Count held payments (paused status)
     held_count_result = await db.execute(

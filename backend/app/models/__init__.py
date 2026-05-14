@@ -5,6 +5,7 @@ from app.models.payment import PaymentAction
 from app.models.payroll import FlaggedRow, PayrollCycle, PayrollHistory
 from app.models.relationship import RelationshipEdge, RelationshipNode
 from app.models.settings import SystemSettings
+from app.models.topup import TreasuryTopUp
 
 __all__ = [
     "Employee",
@@ -17,4 +18,5 @@ __all__ = [
     "RelationshipEdge",
     "AuditEvent",
     "SystemSettings",
+    "TreasuryTopUp",
 ]
