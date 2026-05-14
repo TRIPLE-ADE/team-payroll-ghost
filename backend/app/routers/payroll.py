@@ -78,6 +78,22 @@ async def list_cycles(
     return [_cycle_summary(c) for c in result.scalars().all()]
 
 
+@router.get("/cycles/current", response_model=PayrollCycleSummary | None)
+async def get_current_cycle(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Current operational payroll run (newest cycle in ready/analyzing status)."""
+    result = await db.execute(
+        select(PayrollCycle)
+        .where(PayrollCycle.processing_status.in_(["ready", "analyzing"]))
+        .order_by(PayrollCycle.uploaded_at.desc())
+        .limit(1)
+    )
+    cycle = result.scalar_one_or_none()
+    return _cycle_summary(cycle) if cycle else None
+
+
 @router.get("/cycles/{cycle_id}", response_model=PayrollCycleDetail)
 async def get_cycle(
     cycle_id: str,

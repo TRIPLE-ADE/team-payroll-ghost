@@ -494,7 +494,84 @@ Expected:
 
 ---
 
-## Test 14 — Interactive Swagger UI
+## Test 14 — Treasury Funding Checkout (Squad Sandbox)
+
+This exercises the new payroll-float top-up flow:
+
+1. Create a funding checkout session
+2. Open the returned `checkoutUrl`
+3. Choose `transfer` in the Squad checkout
+4. Copy the dynamic virtual account number shown by Squad
+5. Simulate the transfer in sandbox
+6. Verify the top-up locally
+
+```bash
+# 1. Login
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@ghostguard.io","password":"changeme123"}' | jq -r '.access_token')
+
+# 2. Initiate top-up (amount is whole naira)
+TOPUP=$(curl -s -X POST http://localhost:8000/api/v1/treasury/topups/initiate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 5000,
+    "paymentChannels": ["transfer"],
+    "customerName": "GhostGuard Demo HR"
+  }')
+
+echo "$TOPUP" | jq
+
+TOPUP_ID=$(echo "$TOPUP" | jq -r '.id')
+CHECKOUT_URL=$(echo "$TOPUP" | jq -r '.checkoutUrl')
+
+# 3. Open checkoutUrl in your browser and choose transfer.
+# Squad will show a dynamic virtual account number for that payment attempt.
+echo "$CHECKOUT_URL"
+
+# 4. Simulate the transfer in sandbox after copying the dynamic VA number.
+# Replace 1234567890 with the VA shown inside Squad checkout.
+curl -s -X POST "http://localhost:8000/api/v1/treasury/topups/$TOPUP_ID/simulate-transfer" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "virtualAccountNumber": "1234567890"
+  }' | jq
+
+# 5. Explicitly refresh status from Squad verify endpoint
+curl -s -X POST "http://localhost:8000/api/v1/treasury/topups/$TOPUP_ID/verify" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# 6. Inspect the stored top-up record
+curl -s "http://localhost:8000/api/v1/treasury/topups/$TOPUP_ID" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# 7. List recent top-ups
+curl -s "http://localhost:8000/api/v1/treasury/topups" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# 8. Re-check treasury wallet balance
+curl -s "http://localhost:8000/api/v1/treasury/wallet" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+Expected:
+
+- `initiate` returns `status: "pending"` plus a real `checkoutUrl`
+- `simulate-transfer` stores the dynamic VA you used
+- `verify` eventually moves the top-up to `success`
+- `/api/v1/treasury/wallet` reflects the live Squad merchant balance
+
+Notes:
+
+- `simulate-transfer` only works against Squad sandbox
+- the dynamic virtual account number comes from the Squad checkout UI, not from our database
+- the callback URL used by default is `/api/v1/treasury/topups/{id}/redirect`
+
+---
+
+## Test 15 — Interactive Swagger UI
 
 The fastest way to explore all endpoints:
 

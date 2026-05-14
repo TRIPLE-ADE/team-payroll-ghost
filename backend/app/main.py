@@ -6,12 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 from app.routers import audit, auth, employees, integrity, investigations
 from app.routers import payments, payroll, relationships, settings, webhooks
+from app.routers import operations, treasury, squad
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        print(f"⚠️  Database initialization failed (non-critical): {e}")
     yield
 
 
@@ -41,6 +45,9 @@ app.include_router(relationships.router)
 app.include_router(audit.router)
 app.include_router(settings.router)
 app.include_router(webhooks.router)
+app.include_router(operations.router)
+app.include_router(treasury.router)
+app.include_router(squad.router)
 
 
 @app.get("/health", tags=["system"])

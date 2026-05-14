@@ -29,6 +29,27 @@ router = APIRouter(prefix="/api/v1/investigations", tags=["investigations"])
 
 # ── Serializer helpers ───────────────────────────────────────────────────────
 
+def _normalize_squad_gender(value: str | None) -> str | None:
+    if not value:
+        return None
+    gender = value.strip().lower()
+    if gender in {"1", "male", "m"}:
+        return "1"
+    if gender in {"2", "female", "f"}:
+        return "2"
+    return None
+
+
+def _build_squad_address(emp: Employee) -> str:
+    # The employee model does not currently store a full residential address.
+    # Use the best available organizational location string so the request
+    # satisfies Squad's required payload shape.
+    for value in (emp.department, emp.mda, emp.bank_name):
+        if value:
+            return f"{value}, Nigeria"
+    return "Payroll Operations, Nigeria"
+
+
 def _inv_to_schema(inv: Investigation) -> InvestigationSchema:
     return InvestigationSchema(
         id=str(inv.id),
@@ -92,6 +113,39 @@ async def _audit(db: AsyncSession, event_type: str, title: str, detail: str, ref
     db.add(AuditEvent(type=event_type, title=title, detail=detail, actor="operator.console", ref_id=ref_id))
 
 
+def _build_squad_customer_payload(emp: Employee) -> tuple[dict | None, list[str]]:
+    missing = []
+    gender = _normalize_squad_gender(emp.gender)
+
+    if not emp.bvn:
+        missing.append("bvn")
+    if not emp.dob:
+        missing.append("dob")
+    if not emp.phone:
+        missing.append("phone")
+    if not gender:
+        missing.append("gender")
+
+    if missing:
+        return None, missing
+
+    name_parts = emp.name.split()
+    first = name_parts[0] if name_parts else emp.name
+    last = name_parts[-1] if len(name_parts) > 1 else emp.name
+
+    return {
+        "emp_id": emp.emp_id,
+        "first_name": first,
+        "last_name": last,
+        "bvn": emp.bvn,
+        "dob": emp.dob,
+        "gender": gender,
+        "mobile_num": emp.phone,
+        "address": _build_squad_address(emp),
+        "email": f"{emp.emp_id}@ghostguard.io",
+    }, []
+
+
 async def _upsert_payment_action(
     db: AsyncSession,
     emp: Employee,
@@ -112,6 +166,7 @@ async def _upsert_payment_action(
     if pa:
         pa.state = state
         pa.history = list(pa.history or []) + [history_entry]
+        pa.updated_at = datetime.now(timezone.utc)
         if squad_ref:
             pa.squad_ref = squad_ref
         if squad_tx_status:
@@ -211,22 +266,21 @@ async def submit_action(
 
     # ── approve_payment ──────────────────────────────────────────────────────
     elif action == "approve_payment":
-        # Step 1: Create/validate virtual account with BVN
-        verified_account_name = None
+        # Step 1: Validate the employee's BVN/KYC profile through Squad.
         if emp.bvn:
-            name_parts = emp.name.split()
-            first = name_parts[0] if name_parts else emp.name
-            last = name_parts[-1] if len(name_parts) > 1 else emp.name
-            va_response = await squad_client.create_virtual_account(
-                emp_id=emp.emp_id,
-                first_name=first,
-                last_name=last,
-                bvn=emp.bvn,
-                dob=emp.dob or "01/01/1990",
-                gender=emp.gender or "M",
-            )
+            squad_payload, missing = _build_squad_customer_payload(emp)
+            if missing:
+                await _audit(
+                    db, "verification",
+                    "BVN validation skipped — incomplete employee KYC",
+                    f"Missing fields for {emp.emp_id}: {', '.join(missing)}",
+                    investigation_id,
+                )
+                await db.commit()
+                return ActionResponse(ok=False, message=f"Missing KYC fields: {', '.join(missing)}")
 
-            if va_response["status"] == "BVN_MISMATCH":
+            va_response = await squad_client.validate_bvn(**squad_payload)
+            if va_response["status"] != "BVN_VALID":
                 await _audit(
                     db, "verification",
                     "BVN validation failed — payment blocked",
@@ -234,53 +288,94 @@ async def submit_action(
                     investigation_id,
                 )
                 await db.commit()
-                return ActionResponse(ok=False, message=f"BVN mismatch: {va_response.get('reason')}")
+                return ActionResponse(ok=False, message=f"BVN validation failed: {va_response.get('reason')}")
 
-            verified_account_name = va_response.get("account_name")
+        # Step 2: Lookup account to confirm routing and use the vetted account name.
+        if not emp.account_number or not emp.bank_code:
+            await _audit(
+                db, "intervention",
+                "Payment release blocked — payout account missing",
+                f"{emp.emp_id} is missing account_number or bank_code",
+                investigation_id,
+            )
+            await db.commit()
+            return ActionResponse(ok=False, message="Employee payout account details are incomplete")
 
-        # Step 2: Lookup account to confirm routing (optional but recommended)
-        if emp.account_number and emp.bank_code:
-            try:
-                lookup_resp = await squad_client.lookup_account(
-                    account_number=emp.account_number,
-                    bank_code=emp.bank_code,
-                )
-                if lookup_resp.get("status") != "success":
-                    await _audit(
-                        db, "intervention",
-                        "Account lookup failed",
-                        f"Account {emp.account_number} invalid or inactive",
-                        investigation_id,
-                    )
-                    await db.commit()
-                    return ActionResponse(ok=False, message="Account validation failed")
-            except Exception as lookup_err:
-                # Log but don't block — continue with verified_account_name
-                await _audit(db, "intervention", "Account lookup error", str(lookup_err), investigation_id)
+        try:
+            lookup_resp = await squad_client.lookup_account(
+                account_number=emp.account_number,
+                bank_code=emp.bank_code,
+            )
+        except Exception as lookup_err:
+            await _audit(db, "intervention", "Account lookup error", str(lookup_err), investigation_id)
+            await db.commit()
+            return ActionResponse(ok=False, message="Account validation failed")
 
-        # Step 3: Fire Squad transfer with verified account name
+        lookup_ok = lookup_resp.get("success") is True or lookup_resp.get("status") == 200
+        lookup_data = lookup_resp.get("data") or {}
+        verified_account_name = lookup_data.get("account_name")
+        if not lookup_ok or not verified_account_name:
+            await _audit(
+                db, "intervention",
+                "Account lookup failed",
+                f"Account {emp.account_number} could not be confirmed by Squad",
+                investigation_id,
+            )
+            await db.commit()
+            return ActionResponse(ok=False, message="Account validation failed")
+
+        # Step 3: Fire Squad transfer with the looked-up account name.
         squad_ref = None
         squad_status = None
-        if emp.account_number and emp.bank_code and verified_account_name:
-            tx_ref = squad_client.build_tx_ref(emp.emp_id)
-            amount_kobo = int(float(emp.salary or 0) * 100)
+        tx_ref = squad_client.build_tx_ref(emp.emp_id)
+        amount_kobo = int(float(emp.salary or 0) * 100)
+        transfer_message = "Payment approved and disbursed"
+        payment_status = "disbursed"
+        try:
+            transfer_resp = await squad_client.transfer(
+                account_number=emp.account_number,
+                bank_code=emp.bank_code,
+                account_name=verified_account_name,
+                amount_kobo=amount_kobo,
+                tx_ref=tx_ref,
+                remark=f"Salary payment - {emp.emp_id}",
+            )
+            squad_ref = tx_ref
+            squad_status = squad_client.normalize_transfer_status(
+                (transfer_resp.get("data") or {}).get("transaction_status")
+                or (transfer_resp.get("data") or {}).get("response_description")
+                or transfer_resp.get("message")
+            )
+            if squad_status == "unknown":
+                squad_status = "success"
+        except Exception as transfer_err:
             try:
-                transfer_resp = await squad_client.transfer(
-                    account_number=emp.account_number,
-                    bank_code=emp.bank_code,
-                    account_name=verified_account_name,  # REQUIRED by Squad
-                    amount_kobo=amount_kobo,
-                    tx_ref=tx_ref,
-                    narration=f"Salary payment — {emp.emp_id}",
-                )
+                requery_resp = await squad_client.requery(tx_ref)
                 squad_ref = tx_ref
-                squad_status = "pending"
-            except Exception as e:
+                requery_data = requery_resp.get("data") or requery_resp
+                squad_status = squad_client.normalize_transfer_status(
+                    requery_data.get("transaction_status")
+                    or requery_resp.get("transaction_status")
+                )
+            except Exception:
                 squad_status = "failed"
-                await _audit(db, "intervention", "Transfer initiation failed", str(e), investigation_id)
+
+            if squad_status == "pending":
+                transfer_message = "Payment approved — Squad transfer pending"
+                payment_status = "approved"
+                await _audit(
+                    db, "intervention",
+                    "Transfer pending re-query",
+                    f"{emp.emp_id} transfer is pending after initial error: {transfer_err}",
+                    investigation_id,
+                )
+            else:
+                await _audit(db, "intervention", "Transfer initiation failed", str(transfer_err), investigation_id)
+                await db.commit()
+                return ActionResponse(ok=False, message="Transfer initiation failed")
 
         if flagged_row:
-            flagged_row.payment_status = "approved"
+            flagged_row.payment_status = payment_status
             db.add(flagged_row)
 
         inv.status = "closed"
@@ -290,7 +385,7 @@ async def submit_action(
 
         await _upsert_payment_action(
             db, emp, inv, "released",
-            {"at": now, "action": "Payment approved and released for disbursement", "actor": "operator.console"},
+            {"at": now, "action": transfer_message, "actor": "operator.console"},
             squad_ref=squad_ref,
             squad_tx_status=squad_status,
             net_amount=float(emp.salary or 0),
@@ -298,12 +393,12 @@ async def submit_action(
         await _append_timeline(inv, {
             "id": f"t{len(inv.timeline or []) + 1}",
             "type": "intervention",
-            "summary": "Payment approved — cleared for disbursement",
+            "summary": transfer_message,
             "severity": "low",
             "detectedAt": now,
             "trustAtPoint": emp.trust_score,
         })
-        await _audit(db, "intervention", "Payment approved", f"{emp.emp_id} — cleared for disbursement", investigation_id)
+        await _audit(db, "intervention", "Payment approved", f"{emp.emp_id} - {transfer_message.lower()}", investigation_id)
         db.add(inv)
 
     # ── escalate ─────────────────────────────────────────────────────────────
@@ -325,20 +420,20 @@ async def submit_action(
 
     # ── request_verification ─────────────────────────────────────────────────
     elif action == "request_verification":
-        squad_result = {"status": "NO_BVN"}
-        if emp.bvn:
-            name_parts = emp.name.split()
-            first = name_parts[0] if name_parts else emp.name
-            last = name_parts[-1] if len(name_parts) > 1 else emp.name
-            squad_result = await squad_client.validate_bvn(
-                emp_id=emp.emp_id,
-                first_name=first,
-                last_name=last,
-                bvn=emp.bvn,
-                dob=emp.dob or "01/01/1990",
-                gender=emp.gender or "M",
+        squad_payload, missing = _build_squad_customer_payload(emp)
+        if missing:
+            emp.verification_status = "expired"
+            db.add(emp)
+            await _audit(
+                db, "verification",
+                "BVN verification could not run",
+                f"Missing fields for {emp.emp_id}: {', '.join(missing)}",
+                investigation_id,
             )
+            await db.commit()
+            return ActionResponse(ok=False, message=f"Missing KYC fields: {', '.join(missing)}")
 
+        squad_result = await squad_client.validate_bvn(**squad_payload)
         verified = squad_result["status"] == "BVN_VALID"
         emp.verification_status = "current" if verified else "expired"
         db.add(emp)
@@ -348,6 +443,11 @@ async def submit_action(
             "BVN verification requested",
             f"{emp.emp_id} — result: {squad_result['status']}",
             investigation_id,
+        )
+        await db.commit()
+        return ActionResponse(
+            ok=verified,
+            message="BVN verification successful" if verified else squad_result.get("reason", "BVN verification failed"),
         )
 
     else:
