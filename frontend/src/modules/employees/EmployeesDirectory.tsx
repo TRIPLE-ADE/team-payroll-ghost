@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { RiskBadge } from "@/components/RiskBadge";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useEmployeesDirectory } from "@/hooks/use-domain-queries";
+import { getApiErrorMessage } from "@/lib/axios-error";
 import { cn, formatCurrency, formatShortDate } from "@/lib/utils";
 import type { RiskSeverity } from "@/types/domain";
 
@@ -15,7 +16,8 @@ function verLabel(s: string) {
 }
 
 export function EmployeesDirectory() {
-  const { data } = useEmployeesDirectory();
+  const { data, isPending, isError, error, isFetching } =
+    useEmployeesDirectory();
   const [dept, setDept] = useState<string | "all">("all");
   const [risk, setRisk] = useState<RiskSeverity | "all">("all");
 
@@ -57,15 +59,21 @@ export function EmployeesDirectory() {
           Department trust baselines
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
-          {deptAvgTrust.map((d) => (
-            <div
-              key={d.name}
-              className="rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 font-mono text-[11px]"
-            >
-              <span className="text-zinc-300">{d.name}</span>
-              <span className="ml-2 text-zinc-500">avg {d.avg}</span>
-            </div>
-          ))}
+          {isPending ? (
+            <span className="text-sm text-zinc-500">Loading baselines…</span>
+          ) : deptAvgTrust.length === 0 ? (
+            <span className="text-sm text-zinc-500">No department data yet.</span>
+          ) : (
+            deptAvgTrust.map((d) => (
+              <div
+                key={d.name}
+                className="rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 font-mono text-[11px]"
+              >
+                <span className="text-zinc-300">{d.name}</span>
+                <span className="ml-2 text-zinc-500">avg {d.avg}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -100,6 +108,13 @@ export function EmployeesDirectory() {
         </label>
       </div>
 
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-zinc-200">Directory</h2>
+        {isFetching && !isPending ? (
+          <span className="font-mono text-[10px] text-zinc-500">Refreshing…</span>
+        ) : null}
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-zinc-800/80">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-zinc-800 bg-zinc-950/80 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
@@ -114,54 +129,82 @@ export function EmployeesDirectory() {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/80">
-            {rows.map((e) => (
-              <tr key={e.id} className="bg-zinc-900/15">
-                <td className="px-4 py-3">
-                  <div className="font-medium text-zinc-100">{e.name}</div>
-                  <div className="font-mono text-[11px] text-zinc-500">{e.id}</div>
-                  <div className="text-[11px] text-zinc-500">{e.role}</div>
-                </td>
-                <td className="px-4 py-3 text-zinc-300">{e.department}</td>
-                <td className="px-4 py-3 font-mono tabular-nums text-zinc-100">
-                  {e.trustScore}
-                </td>
-                <td className="px-4 py-3 font-mono tabular-nums text-zinc-500">
-                  {e.peerGroupAvgTrust}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={cn(
-                      "text-xs",
-                      e.verificationStatus === "expired" && "text-red-300",
-                      e.verificationStatus === "expiring" && "text-amber-200",
-                      e.verificationStatus === "current" && "text-zinc-400",
-                    )}
-                  >
-                    {verLabel(e.verificationStatus)} ·{" "}
-                    {formatShortDate(e.verificationExpiresAt)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 font-mono text-zinc-400">
-                  {e.lastNetPay != null ? formatCurrency(e.lastNetPay) : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <RiskBadge level={e.riskLevel} />
-                  <Link
-                    href={`/relationships?focus=${encodeURIComponent(e.id)}`}
-                    className="mt-2 block font-mono text-[10px] text-zinc-500 hover:text-zinc-300"
-                  >
-                    Relationships →
-                  </Link>
+            {isPending ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-10 text-center text-sm text-zinc-500"
+                >
+                  Loading employees…
                 </td>
               </tr>
-            ))}
+            ) : isError ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-10 text-center text-sm text-red-400"
+                >
+                  {getApiErrorMessage(error)}
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-10 text-center text-sm text-zinc-500"
+                >
+                  {(data ?? []).length === 0
+                    ? "No employees in directory."
+                    : "No employees match filters."}
+                </td>
+              </tr>
+            ) : (
+              rows.map((e) => (
+                <tr key={e.id} className="bg-zinc-900/15">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-zinc-100">{e.name}</div>
+                    <div className="font-mono text-[11px] text-zinc-500">
+                      {e.id}
+                    </div>
+                    <div className="text-[11px] text-zinc-500">{e.role}</div>
+                  </td>
+                  <td className="px-4 py-3 text-zinc-300">{e.department}</td>
+                  <td className="px-4 py-3 font-mono tabular-nums text-zinc-100">
+                    {e.trustScore}
+                  </td>
+                  <td className="px-4 py-3 font-mono tabular-nums text-zinc-500">
+                    {e.peerGroupAvgTrust}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        "text-xs",
+                        e.verificationStatus === "expired" && "text-red-300",
+                        e.verificationStatus === "expiring" && "text-amber-200",
+                        e.verificationStatus === "current" && "text-zinc-400",
+                      )}
+                    >
+                      {verLabel(e.verificationStatus)} ·{" "}
+                      {formatShortDate(e.verificationExpiresAt)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-zinc-400">
+                    {e.lastNetPay != null ? formatCurrency(e.lastNetPay) : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <RiskBadge level={e.riskLevel} />
+                    <Link
+                      href={`/relationships?focus=${encodeURIComponent(e.id)}`}
+                      className="mt-2 block font-mono text-[10px] text-zinc-500 hover:text-zinc-300"
+                    >
+                      Relationships →
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-        {!rows.length ? (
-          <div className="py-12 text-center text-sm text-zinc-500">
-            No employees match filters.
-          </div>
-        ) : null}
       </div>
     </div>
   );

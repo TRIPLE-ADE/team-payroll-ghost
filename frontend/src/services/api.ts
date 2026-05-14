@@ -886,33 +886,35 @@ export const mockApi = {
     });
   },
 
-  async uploadPayrollBatch(input: { fileName: string; employeeCount: number }) {
+  async uploadPayrollBatch(file: File) {
     const id = `cy-up-${Date.now()}`;
-    const totalDisbursement = input.employeeCount * 2450;
+    const fileName = file.name;
+    const totalEmployees = 100;
+    const totalDisbursement = totalEmployees * 2450;
     cycles.unshift({
       id,
-      label: `Staging · ${input.fileName.replace(/\.[^.]+$/, "")}`,
+      label: `Staging · ${fileName.replace(/\.[^.]+$/, "")}`,
       uploadedAt: new Date().toISOString(),
-      totalEmployees: input.employeeCount,
+      totalEmployees,
       totalDisbursement,
       flaggedCount: 0,
       pausedPayments: 0,
       integrityScore: 0,
       processingStatus: "uploaded",
-      sourceFile: input.fileName,
+      sourceFile: fileName,
       flaggedRows: [],
     });
     pushAudit({
       type: "payroll_upload",
       title: "Payroll batch staged",
-      detail: `${input.fileName} — ${input.employeeCount} rows (awaiting analysis)`,
+      detail: `${fileName} — staged (awaiting analysis)`,
       actor: "operator.upload",
       refId: id,
     });
     pushSquadLedger({
       at: new Date().toISOString(),
       title: "Batch received",
-      detail: `${input.fileName} — ${input.employeeCount} rows staged for analysis`,
+      detail: `${fileName} — staged for analysis`,
       squadRef: `SQUAD-ING-${id.split("-").pop()}`,
       direction: "credit",
       relatedCycleId: id,

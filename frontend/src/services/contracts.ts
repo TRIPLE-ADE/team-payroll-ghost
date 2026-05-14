@@ -10,7 +10,7 @@
  * GET  /api/v1/trends/integrity            -> TrendPoint[]
  * GET  /api/v1/payroll/cycles              -> PayrollCycleSummary[] (incl. processingStatus)
  * GET  /api/v1/payroll/cycles/:id         -> PayrollCycleDetail
- * POST /api/v1/payroll/cycles             -> multipart upload OR body: { fileName, employeeCount }
+ * POST /api/v1/payroll/cycles             -> multipart/form-data: field `file` (binary); response e.g. { id }
  * POST /api/v1/payroll/cycles/:id/analyze -> start integrity analysis from staged upload
  * GET  /api/v1/investigations              -> Investigation[]
  * GET  /api/v1/investigations/:id          -> Investigation & EmployeeProfile
