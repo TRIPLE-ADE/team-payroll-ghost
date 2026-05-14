@@ -34,8 +34,12 @@ import {
   fetchSystemSettings,
   updateSystemSettings,
 } from "@/services/settings-api";
-import { fetchTreasuryWallet } from "@/services/treasury-api";
-import type { InvestigationActionType, SystemSettings } from "@/types/domain";
+import { fetchTreasuryWallet, initiateTreasuryTopup } from "@/services/treasury-api";
+import type {
+  InvestigationActionType,
+  SystemSettings,
+  TreasuryTopupInitiateRequest,
+} from "@/types/domain";
 
 export const qk = {
   overview: ["integrity", "overview"] as const,
@@ -78,6 +82,13 @@ export function useIntegrityTrends() {
 
 export function useTreasuryWallet() {
   return useQuery({ queryKey: qk.treasury, queryFn: fetchTreasuryWallet });
+}
+
+export function useInitiateTreasuryTopup() {
+  return useMutation({
+    mutationFn: (body: TreasuryTopupInitiateRequest) =>
+      initiateTreasuryTopup(body),
+  });
 }
 
 export function useLiquiditySnapshot() {

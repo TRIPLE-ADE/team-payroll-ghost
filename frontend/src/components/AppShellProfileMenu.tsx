@@ -6,20 +6,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { useAuth } from "@/contexts/auth-context";
 import { useSystemSettings } from "@/hooks/use-domain-queries";
+import { decodeJwtPayload } from "@/lib/jwt-payload";
 import { cn } from "@/lib/utils";
-
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const part = token.split(".")[1];
-    if (!part) return null;
-    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-    const json = atob(pad);
-    return JSON.parse(json) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
 
 function truncateLabel(label: string, max: number): string {
   return label.length > max ? `${label.slice(0, max)}…` : label;
