@@ -107,7 +107,7 @@ function Hero() {
               className="font-mono text-[10px] uppercase tracking-widest"
               style={{ color: CREAM_SOFT }}
             >
-              Live · Squad Hackathon 3.0
+              Live · Workforce Integrity Infrastructure
             </span>
           </motion.div>
 
